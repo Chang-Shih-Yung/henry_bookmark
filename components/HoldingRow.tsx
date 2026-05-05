@@ -16,13 +16,17 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import type { EnrichedHolding } from '@/lib/types';
+import type { EnrichedHolding, Holding } from '@/lib/types';
 import { formatTwd, formatPct, formatUnits } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type Props = {
   holding: EnrichedHolding;
-  onUpdate: (next: { units: number; costBasisTwd: number }) => void;
+  /** 即時 USD/TWD 匯率,用於 crypto 成本 USD 輸入轉 TWD。null = 載入中或失敗。 */
+  usdTwd: number | null | undefined;
+  onUpdate: (
+    next: Partial<Pick<Holding, 'units' | 'costBasisTwd' | 'monthlyAutoBuyTwd'>>,
+  ) => void;
   onDelete: () => void;
   onBuyClick: () => void;
   onSellClick: () => void;
@@ -30,6 +34,7 @@ type Props = {
 
 export function HoldingRow({
   holding,
+  usdTwd,
   onUpdate,
   onDelete,
   onBuyClick,
@@ -37,8 +42,16 @@ export function HoldingRow({
 }: Props) {
   const [editingUnits, setEditingUnits] = useState(false);
   const [editingCost, setEditingCost] = useState(false);
+  const [editingMonthly, setEditingMonthly] = useState(false);
+
+  const isCrypto = holding.type === 'crypto';
+  const fxRate = usdTwd ?? 0;
+
   const [unitsInput, setUnitsInput] = useState(String(holding.units));
   const [costInput, setCostInput] = useState(String(holding.costBasisTwd));
+  const [monthlyInput, setMonthlyInput] = useState(
+    String(holding.monthlyAutoBuyTwd ?? ''),
+  );
 
   const pnlPositive = holding.unrealizedPnlTwd >= 0;
 
@@ -47,23 +60,57 @@ export function HoldingRow({
     if (!isFinite(parsed) || parsed < 0) {
       setUnitsInput(String(holding.units));
     } else if (parsed !== holding.units) {
-      onUpdate({ units: parsed, costBasisTwd: holding.costBasisTwd });
+      onUpdate({ units: parsed });
     }
     setEditingUnits(false);
   };
+
   const commitCost = () => {
     const parsed = Number(costInput);
     if (!isFinite(parsed) || parsed < 0) {
-      setCostInput(String(holding.costBasisTwd));
-    } else if (parsed !== holding.costBasisTwd) {
-      onUpdate({ units: holding.units, costBasisTwd: parsed });
+      // 還原
+      setCostInput(
+        isCrypto && fxRate > 0
+          ? (holding.costBasisTwd / fxRate).toFixed(2)
+          : String(holding.costBasisTwd),
+      );
+      setEditingCost(false);
+      return;
+    }
+    // crypto:input 是 USD,轉 TWD 才存
+    const newCostTwd =
+      isCrypto && fxRate > 0 ? Math.round(parsed * fxRate) : parsed;
+    if (Math.abs(newCostTwd - holding.costBasisTwd) > 0.5) {
+      onUpdate({ costBasisTwd: newCostTwd });
     }
     setEditingCost(false);
   };
 
+  const commitMonthly = () => {
+    const trimmed = monthlyInput.trim();
+    if (trimmed === '') {
+      if (holding.monthlyAutoBuyTwd != null) {
+        onUpdate({ monthlyAutoBuyTwd: undefined });
+      }
+      setEditingMonthly(false);
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!isFinite(parsed) || parsed < 0) {
+      setMonthlyInput(String(holding.monthlyAutoBuyTwd ?? ''));
+    } else if (parsed !== (holding.monthlyAutoBuyTwd ?? 0)) {
+      onUpdate({
+        monthlyAutoBuyTwd: parsed > 0 ? parsed : undefined,
+      });
+    }
+    setEditingMonthly(false);
+  };
+
+  const monthlyAmount = holding.monthlyAutoBuyTwd ?? 0;
+
   return (
     <div className="flex items-center justify-between gap-2 py-2 px-1 border-b border-border/50 last:border-b-0">
-      {/* Left: name + units */}
+      {/* Left: name + units · cost · monthly */}
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-sm font-medium truncate">{holding.displayName}</span>
@@ -77,7 +124,8 @@ export function HoldingRow({
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground flex-wrap">
+          {/* Units */}
           <Popover open={editingUnits} onOpenChange={setEditingUnits}>
             <PopoverTrigger
               className="hover:text-foreground transition-colors"
@@ -113,12 +161,21 @@ export function HoldingRow({
               </p>
             </PopoverContent>
           </Popover>
+
           <span>·</span>
+
+          {/* Cost */}
           <Popover open={editingCost} onOpenChange={setEditingCost}>
             <PopoverTrigger
               className="hover:text-foreground transition-colors"
               onClick={() => {
-                setCostInput(String(holding.costBasisTwd));
+                setCostInput(
+                  isCrypto && fxRate > 0
+                    ? holding.costBasisTwd > 0
+                      ? (holding.costBasisTwd / fxRate).toFixed(2)
+                      : ''
+                    : String(holding.costBasisTwd),
+                );
                 setEditingCost(true);
               }}
             >
@@ -126,12 +183,14 @@ export function HoldingRow({
             </PopoverTrigger>
             <PopoverContent className="w-64" align="start">
               <Label htmlFor={`cost-${holding.id}`} className="text-xs">
-                累計成本(TWD)
+                {isCrypto
+                  ? '累計成本(USD,從幣安抄)'
+                  : '累計成本(TWD)'}
               </Label>
               <Input
                 id={`cost-${holding.id}`}
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 step="any"
                 value={costInput}
                 onChange={(e) => setCostInput(e.target.value)}
@@ -143,7 +202,66 @@ export function HoldingRow({
                 autoFocus
                 className="mt-1"
               />
+              {isCrypto && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {fxRate > 0 ? (
+                    <>
+                      USD/TWD = {fxRate.toFixed(2)}
+                      {Number(costInput) > 0 &&
+                        ` · ≈ ${formatTwd(Number(costInput) * fxRate)}`}
+                    </>
+                  ) : (
+                    <span className="text-warning">即時匯率載入中,稍後再儲存</span>
+                  )}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground mt-2">
+                Enter 確認 / Esc 取消
+              </p>
+            </PopoverContent>
+          </Popover>
+
+          <span>·</span>
+
+          {/* Monthly DCA */}
+          <Popover open={editingMonthly} onOpenChange={setEditingMonthly}>
+            <PopoverTrigger
+              className={cn(
+                'hover:text-foreground transition-colors',
+                monthlyAmount === 0 && 'text-muted-foreground/70',
+              )}
+              onClick={() => {
+                setMonthlyInput(String(holding.monthlyAutoBuyTwd ?? ''));
+                setEditingMonthly(true);
+              }}
+            >
+              {monthlyAmount > 0
+                ? `月扣 ${formatTwd(monthlyAmount)}`
+                : '+ 月扣'}
+            </PopoverTrigger>
+            <PopoverContent className="w-64" align="start">
+              <Label htmlFor={`monthly-${holding.id}`} className="text-xs">
+                定期定額(每月 TWD)
+              </Label>
+              <Input
+                id={`monthly-${holding.id}`}
+                type="number"
+                inputMode="numeric"
+                step="any"
+                placeholder="例如 5000"
+                value={monthlyInput}
+                onChange={(e) => setMonthlyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitMonthly();
+                  if (e.key === 'Escape') setEditingMonthly(false);
+                }}
+                onBlur={commitMonthly}
+                autoFocus
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                長期試算用這個值推累積。空白或 0 = 不定額。
+                <br />
                 Enter 確認 / Esc 取消
               </p>
             </PopoverContent>

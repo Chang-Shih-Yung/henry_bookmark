@@ -223,6 +223,7 @@ export function Dashboard() {
                 <HoldingRow
                   key={h.id}
                   holding={h}
+                  usdTwd={pricesQ.data?.usdTwd}
                   onUpdate={(patch) => updateHolding(h.id, patch)}
                   onDelete={() => deleteHolding(h.id)}
                   onBuyClick={() => setBuyTarget(h)}
