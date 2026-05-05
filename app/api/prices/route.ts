@@ -56,9 +56,10 @@ async function fetchCoingecko(): Promise<{
   btc: number;
   eth: number;
   ada: number;
+  doge: number;
 }> {
   const url =
-    'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano&vs_currencies=twd';
+    'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano,dogecoin&vs_currencies=twd';
   const res = await fetch(url, { next: { revalidate: 60 } });
   if (!res.ok) throw new Error(`coingecko HTTP ${res.status}`);
   const json = await res.json();
@@ -67,6 +68,7 @@ async function fetchCoingecko(): Promise<{
     btc: parsed.bitcoin?.twd ?? NaN,
     eth: parsed.ethereum?.twd ?? NaN,
     ada: parsed.cardano?.twd ?? NaN,
+    doge: parsed.dogecoin?.twd ?? NaN,
   };
 }
 
@@ -125,6 +127,7 @@ export async function GET() {
     btc: cryptoR.value && Number.isFinite(cryptoR.value.btc) ? 'ok' : 'failed',
     eth: cryptoR.value && Number.isFinite(cryptoR.value.eth) ? 'ok' : 'failed',
     ada: cryptoR.value && Number.isFinite(cryptoR.value.ada) ? 'ok' : 'failed',
+    doge: cryptoR.value && Number.isFinite(cryptoR.value.doge) ? 'ok' : 'failed',
     usdTwd: usdTwd !== null ? 'ok' : 'failed',
   };
 
@@ -153,6 +156,7 @@ export async function GET() {
     btc: cryptoR.value && Number.isFinite(cryptoR.value.btc) ? cryptoR.value.btc : null,
     eth: cryptoR.value && Number.isFinite(cryptoR.value.eth) ? cryptoR.value.eth : null,
     ada: cryptoR.value && Number.isFinite(cryptoR.value.ada) ? cryptoR.value.ada : null,
+    doge: cryptoR.value && Number.isFinite(cryptoR.value.doge) ? cryptoR.value.doge : null,
     usdTwd,
     fetchedAt: new Date().toISOString(),
     _debug: { sources, latencyMs },

@@ -1,10 +1,12 @@
 import type { Holdings, Holding } from './types';
 
 /**
- * 第一次登入時的預設 holdings 範本。
- * 使用者進來會看到所有資產類別的範例,可以編輯 / 刪除。
+ * 第一次登入時的預設 holdings(Henry 的真實基準值,USD/TWD = 31.68)。
+ * 之後 user 在 dashboard 直接編,Redis 覆蓋。
  *
- * 富邦信託預設 monthlyAutoBuyTwd: 4000(自存 2000 + 公司補 2000)。
+ * 來源:
+ * - 台股 / 美股:中信銀行 app「申購明細」頁累計扣款 + 月扣金額
+ * - 加密:幣安 app「資產 → 加密貨幣」持有量 × 平均買入價
  */
 function uid(): string {
   return crypto.randomUUID();
@@ -14,14 +16,15 @@ const now = (): string => new Date().toISOString();
 
 export function defaultHoldings(): Holdings {
   const items: Holding[] = [
+    // ── 台股(TWD)──
     {
       id: uid(),
       type: 'tw_stock',
       symbol: '2330.TW',
       displayName: '台積電',
-      units: 0,
-      costBasisTwd: 0,
-      monthlyAutoBuyTwd: 5000,
+      units: 15,
+      costBasisTwd: 23_751,
+      monthlyAutoBuyTwd: 5_000,
       updatedAt: now(),
     },
     {
@@ -29,19 +32,20 @@ export function defaultHoldings(): Holdings {
       type: 'tw_stock',
       symbol: '0050.TW',
       displayName: '元大台灣 50',
-      units: 0,
-      costBasisTwd: 0,
-      monthlyAutoBuyTwd: 6000,
+      units: 885,
+      costBasisTwd: 62_599,
+      monthlyAutoBuyTwd: 6_000,
       updatedAt: now(),
     },
+    // ── 美股(USD 換 TWD,匯率 31.68)──
     {
       id: uid(),
       type: 'us_stock',
       symbol: 'GOOGL',
       displayName: 'Google',
-      units: 0,
-      costBasisTwd: 0,
-      monthlyAutoBuyTwd: 1600, // ~50 USD * 32 TWD
+      units: 0.20205,
+      costBasisTwd: 1_907, // ≈ $60.20 × 31.68
+      monthlyAutoBuyTwd: 1_584, // = $50 × 31.68
       updatedAt: now(),
     },
     {
@@ -49,18 +53,19 @@ export function defaultHoldings(): Holdings {
       type: 'us_stock',
       symbol: 'VTI',
       displayName: 'VTI 全市場',
-      units: 0,
-      costBasisTwd: 0,
-      monthlyAutoBuyTwd: 3200, // ~100 USD * 32 TWD
+      units: 0.45724,
+      costBasisTwd: 4_758, // ≈ $150.20 × 31.68
+      monthlyAutoBuyTwd: 3_168, // = $100 × 31.68
       updatedAt: now(),
     },
+    // ── 加密貨幣(USD 換 TWD,匯率 31.68)──
     {
       id: uid(),
       type: 'crypto',
       symbol: 'BTC',
       displayName: '比特幣',
       units: 0,
-      costBasisTwd: 80_000,
+      costBasisTwd: 0,
       updatedAt: now(),
     },
     {
@@ -68,8 +73,8 @@ export function defaultHoldings(): Holdings {
       type: 'crypto',
       symbol: 'ETH',
       displayName: '以太幣',
-      units: 0,
-      costBasisTwd: 0,
+      units: 0.19435692,
+      costBasisTwd: 21_273, // ≈ $671.49 × 31.68
       updatedAt: now(),
     },
     {
@@ -77,10 +82,20 @@ export function defaultHoldings(): Holdings {
       type: 'crypto',
       symbol: 'ADA',
       displayName: '艾達幣',
-      units: 0,
-      costBasisTwd: 0,
+      units: 5408.57497361,
+      costBasisTwd: 98_624, // ≈ $3,113.14 × 31.68
       updatedAt: now(),
     },
+    {
+      id: uid(),
+      type: 'crypto',
+      symbol: 'DOGE',
+      displayName: '狗狗幣',
+      units: 1808.49499497,
+      costBasisTwd: 15_354, // ≈ $484.68 × 31.68
+      updatedAt: now(),
+    },
+    // ── 現金 / 信託(目前留空,user 自己填)──
     {
       id: uid(),
       type: 'cash_twd',
@@ -88,7 +103,7 @@ export function defaultHoldings(): Holdings {
       displayName: '台幣活存',
       units: 0,
       costBasisTwd: 0,
-      monthlyAutoBuyTwd: 6700,
+      monthlyAutoBuyTwd: 6_700,
       updatedAt: now(),
     },
     {
@@ -107,7 +122,7 @@ export function defaultHoldings(): Holdings {
       displayName: '富邦信託(自存 2000 + 公司 2000)',
       units: 0,
       costBasisTwd: 0,
-      monthlyAutoBuyTwd: 4000,
+      monthlyAutoBuyTwd: 4_000,
       notes: '無公開即時價,以累計買入金額估算市值',
       updatedAt: now(),
     },

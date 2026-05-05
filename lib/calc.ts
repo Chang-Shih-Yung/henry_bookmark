@@ -63,6 +63,7 @@ function lookupPriceTwd(holding: Holding, prices: Prices): number | null {
       if (holding.symbol === 'BTC') return prices.btc;
       if (holding.symbol === 'ETH') return prices.eth;
       if (holding.symbol === 'ADA') return prices.ada;
+      if (holding.symbol === 'DOGE') return prices.doge;
       return null;
     case 'cash_twd':
       return 1;

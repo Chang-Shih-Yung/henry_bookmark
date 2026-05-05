@@ -3,7 +3,7 @@
 export type AssetType =
   | 'tw_stock' // 台股
   | 'us_stock' // 美股
-  | 'crypto' // 加密貨幣 (BTC / ETH / ADA)
+  | 'crypto' // 加密貨幣 (BTC / ETH / ADA / DOGE)
   | 'cash_twd' // 台幣現金
   | 'cash_usd' // 美金現金
   | 'trust'; // 富邦信託
@@ -21,7 +21,7 @@ export type Scenario = 'conservative' | 'neutral' | 'optimistic';
 export type Holding = {
   id: string; // uuid
   type: AssetType;
-  symbol: string; // '2330.TW' / 'GOOGL' / 'BTC' / 'ETH' / 'ADA' / 'TWD-Bank' / 'USD-Cash' / 'fubon-trust'
+  symbol: string; // '2330.TW' / 'GOOGL' / 'BTC' / 'ETH' / 'ADA' / 'DOGE' / 'TWD-Bank' / 'USD-Cash' / 'fubon-trust'
   displayName: string; // 顯示名稱,例:台積電 / Google / 比特幣 / 活存
 
   units: number;
@@ -73,6 +73,7 @@ export type Prices = {
   btc: number | null;
   eth: number | null;
   ada: number | null;
+  doge: number | null;
   usdTwd: number | null;
   fetchedAt: string;
 };

@@ -19,6 +19,7 @@ const samplePrices: Prices = {
   btc: 1_700_000, // TWD per BTC
   eth: 100_000,
   ada: 18,
+  doge: 9, // TWD per DOGE
   usdTwd: 32,
   fetchedAt: ts,
 };
