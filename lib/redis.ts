@@ -1,13 +1,20 @@
 import { Redis } from '@upstash/redis';
 
 /**
- * Upstash Redis client(取代 deprecated 的 @vercel/kv)。
- * Vercel Marketplace 加 Upstash Redis integration 後,以下 env vars 會自動注入:
- *   - UPSTASH_REDIS_REST_URL
- *   - UPSTASH_REDIS_REST_TOKEN
- *
- * 本機開發:在 .env.local 填入(從 Upstash console 拿)。
+ * Vercel Marketplace 的 Upstash integration 注入的是 KV_REST_API_* (legacy @vercel/kv naming),
+ * 直接用 Upstash console 拿的話則是 UPSTASH_REDIS_REST_*。兩種都接受。
  */
-export const redis = Redis.fromEnv();
+const url =
+  process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const token =
+  process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+
+if (!url || !token) {
+  throw new Error(
+    'Missing Upstash Redis credentials. Set UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN (Upstash console) or KV_REST_API_URL/KV_REST_API_TOKEN (Vercel Upstash integration).',
+  );
+}
+
+export const redis = new Redis({ url, token });
 
 export const holdingsKey = (email: string) => `holdings:${email.toLowerCase()}`;
