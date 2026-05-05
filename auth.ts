@@ -1,0 +1,27 @@
+import NextAuth from 'next-auth';
+import Google from 'next-auth/providers/google';
+
+const ALLOWED = (process.env.ALLOWED_EMAILS ?? '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  providers: [Google],
+  callbacks: {
+    async signIn({ profile }) {
+      const email = profile?.email?.toLowerCase();
+      if (!email) return false;
+      if (ALLOWED.length === 0) return false; // fail closed
+      return ALLOWED.includes(email);
+    },
+    async session({ session, token }) {
+      if (session.user && token.email) {
+        session.user.email = token.email;
+      }
+      return session;
+    },
+  },
+  session: { strategy: 'jwt' },
+  pages: { signIn: '/login' },
+});
