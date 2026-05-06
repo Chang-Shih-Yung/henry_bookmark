@@ -9,6 +9,7 @@ import {
   BarChart3,
   Eye,
   EyeOff,
+  ChevronRight,
 } from 'lucide-react';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
 import { useHoldings, usePrices, useUpdateHoldings } from '@/lib/api';
@@ -35,14 +36,42 @@ import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const TYPE_GROUPS: Array<{ type: AssetType; label: string; icon: string }> = [
-  { type: 'tw_stock', label: '台股', icon: '🇹🇼' },
-  { type: 'us_stock', label: '美股', icon: '🇺🇸' },
-  { type: 'crypto', label: '加密貨幣', icon: '₿' },
-  { type: 'cash_twd', label: '台幣', icon: '💵' },
-  { type: 'cash_usd', label: '美金', icon: '💵' },
-  { type: 'trust', label: '富邦信託', icon: '🏦' },
+type TabValue =
+  | 'all'
+  | 'tw_stock'
+  | 'us_stock'
+  | 'crypto'
+  | 'cash'
+  | 'trust';
+
+const TABS: Array<{ value: TabValue; label: string; icon: string }> = [
+  { value: 'all', label: '全部', icon: '📊' },
+  { value: 'tw_stock', label: '台股', icon: '🇹🇼' },
+  { value: 'us_stock', label: '美股', icon: '🇺🇸' },
+  { value: 'crypto', label: '加密', icon: '₿' },
+  { value: 'cash', label: '現金', icon: '💵' },
+  { value: 'trust', label: '信託', icon: '🏦' },
 ];
+
+/** 「全部」分頁 → 點分類卡可跳到對應 tab。 */
+const TAB_SUMMARIES: Array<{
+  tab: Exclude<TabValue, 'all'>;
+  label: string;
+  icon: string;
+  types: AssetType[];
+}> = [
+  { tab: 'tw_stock', label: '台股', icon: '🇹🇼', types: ['tw_stock'] },
+  { tab: 'us_stock', label: '美股', icon: '🇺🇸', types: ['us_stock'] },
+  { tab: 'crypto', label: '加密貨幣', icon: '₿', types: ['crypto'] },
+  { tab: 'cash', label: '現金', icon: '💵', types: ['cash_twd', 'cash_usd'] },
+  { tab: 'trust', label: '富邦信託', icon: '🏦', types: ['trust'] },
+];
+
+function tabMatches(tab: TabValue, type: AssetType): boolean {
+  if (tab === 'all') return true;
+  if (tab === 'cash') return type === 'cash_twd' || type === 'cash_usd';
+  return tab === type;
+}
 
 export function Dashboard() {
   const holdingsQ = useHoldings();
@@ -57,6 +86,7 @@ export function Dashboard() {
   );
   const [editTarget, setEditTarget] = useState<EnrichedHolding | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
+  const [tab, setTab] = useState<TabValue>('all');
 
   const enriched: EnrichedHolding[] = useMemo(() => {
     if (!holdingsQ.data || !pricesQ.data) return [];
@@ -224,44 +254,118 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Allocation pie */}
-      {summary.totalAssetTwd > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-medium font-display">資產分布</h2>
-          <AllocationPie summary={summary} />
-        </section>
-      )}
+      {/* Sticky tab bar */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b border-border">
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-none">
+          {TABS.map((t) => {
+            const count =
+              t.value === 'all'
+                ? enriched.length
+                : enriched.filter((h) => tabMatches(t.value, h.type)).length;
+            const active = tab === t.value;
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTab(t.value)}
+                className={cn(
+                  'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  active
+                    ? 'bg-foreground text-background'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                )}
+              >
+                <span>{t.icon}</span>
+                <span>{t.label}</span>
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      'tabular-nums text-[10px]',
+                      active ? 'text-background/70' : 'text-muted-foreground/60',
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-      {/* Holdings groups */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-medium font-display">持有部位</h2>
-        {TYPE_GROUPS.map((g) => {
-          const items = enriched.filter((h) => h.type === g.type);
-          const subtotal = items.reduce((s, h) => s + h.marketValueTwd, 0);
-          const cost = items.reduce((s, h) => s + h.costBasisTwd, 0);
-          const pnlPct = cost > 0 ? (subtotal - cost) / cost : 0;
-          const positive = subtotal - cost >= 0;
-          return (
-            <div key={g.type} className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground border-b border-border pb-1">
-                <span className="font-medium">
-                  {g.icon} {g.label}
-                </span>
-                <span className="tabular-nums">
-                  {maskMoney(formatTwd(subtotal), privacy)}{' '}
-                  {cost > 0 && (
-                    <span
-                      className={cn(
-                        'ml-1',
-                        positive ? 'text-up' : 'text-down',
-                      )}
-                    >
-                      {formatPct(pnlPct)}
-                    </span>
-                  )}
-                </span>
-              </div>
-              {items.map((h) => (
+      {/* Tab content */}
+      {tab === 'all' ? (
+        <>
+          {summary.totalAssetTwd > 0 && (
+            <section className="space-y-2">
+              <h2 className="text-sm font-medium font-display">資產分布</h2>
+              <AllocationPie summary={summary} />
+            </section>
+          )}
+          <section className="space-y-2">
+            <h2 className="text-sm font-medium font-display">分類</h2>
+            <div className="space-y-2">
+              {TAB_SUMMARIES.map((s) => {
+                const items = enriched.filter((h) => s.types.includes(h.type));
+                const subtotal = items.reduce(
+                  (sum, h) => sum + h.marketValueTwd,
+                  0,
+                );
+                const cost = items.reduce((sum, h) => sum + h.costBasisTwd, 0);
+                const pnlPct = cost > 0 ? (subtotal - cost) / cost : 0;
+                const positive = subtotal - cost >= 0;
+                return (
+                  <button
+                    key={s.tab}
+                    type="button"
+                    onClick={() => setTab(s.tab)}
+                    className="w-full flex items-center justify-between rounded-lg border border-border bg-card p-3.5 hover:bg-accent/30 active:bg-accent/50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg">{s.icon}</span>
+                      <div>
+                        <div className="text-sm font-medium">{s.label}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {items.length} 筆
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-sm font-semibold tabular-nums">
+                          {maskMoney(formatTwd(subtotal), privacy)}
+                        </div>
+                        {cost > 0 && (
+                          <div
+                            className={cn(
+                              'text-xs tabular-nums',
+                              positive ? 'text-up' : 'text-down',
+                            )}
+                          >
+                            {positive ? '▲' : '▼'} {formatPct(pnlPct)}
+                          </div>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className="space-y-2">
+          {enriched.filter((h) => tabMatches(tab, h.type)).length === 0 ? (
+            <div className="text-center py-12 text-sm text-muted-foreground">
+              這個分類還沒有資產。
+              <br />
+              用下面的按鈕新增第一筆。
+            </div>
+          ) : (
+            enriched
+              .filter((h) => tabMatches(tab, h.type))
+              .map((h) => (
                 <HoldingRow
                   key={h.id}
                   holding={h}
@@ -269,19 +373,11 @@ export function Dashboard() {
                   onUpdate={(patch) => updateHolding(h.id, patch)}
                   onCardClick={() => setDetailTarget(h)}
                 />
-              ))}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setNewType(g.type)}
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> 新增{g.label}
-              </Button>
-            </div>
-          );
-        })}
-      </section>
+              ))
+          )}
+          <NewButtons tab={tab} onNew={(type) => setNewType(type)} />
+        </section>
+      )}
 
       {/* Footer info */}
       <footer className="pt-6 text-center text-xs text-muted-foreground">
@@ -353,6 +449,60 @@ export function Dashboard() {
         }}
       />
     </main>
+  );
+}
+
+/** 分頁底部的「+ 新增」按鈕。現金分頁顯示兩顆(台幣 / 美金),其他單顆。 */
+function NewButtons({
+  tab,
+  onNew,
+}: {
+  tab: Exclude<TabValue, 'all'>;
+  onNew: (type: AssetType) => void;
+}) {
+  if (tab === 'cash') {
+    return (
+      <div className="grid grid-cols-2 gap-2 pt-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onNew('cash_twd')}
+          className="gap-1"
+        >
+          <Plus className="h-3.5 w-3.5" /> 新增台幣
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onNew('cash_usd')}
+          className="gap-1"
+        >
+          <Plus className="h-3.5 w-3.5" /> 新增美金
+        </Button>
+      </div>
+    );
+  }
+  const labels: Record<Exclude<TabValue, 'all' | 'cash'>, string> = {
+    tw_stock: '台股',
+    us_stock: '美股',
+    crypto: '加密貨幣',
+    trust: '信託',
+  };
+  const types: Record<Exclude<TabValue, 'all' | 'cash'>, AssetType> = {
+    tw_stock: 'tw_stock',
+    us_stock: 'us_stock',
+    crypto: 'crypto',
+    trust: 'trust',
+  };
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={() => onNew(types[tab])}
+      className="w-full gap-1 mt-2"
+    >
+      <Plus className="h-3.5 w-3.5" /> 新增{labels[tab]}
+    </Button>
   );
 }
 
