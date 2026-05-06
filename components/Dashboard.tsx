@@ -36,9 +36,9 @@ import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { AllocationPie } from '@/components/AllocationPie';
 import { HoldingRow } from '@/components/HoldingRow';
 import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
-import { HoldingEditSheet } from '@/components/HoldingEditSheet';
 import { BuyDialog, SellDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
+import type { TransactionKind } from '@/lib/types';
 import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -91,12 +91,14 @@ export function Dashboard() {
   const updateMut = useUpdateHoldings();
   const { privacy, toggle: togglePrivacy } = usePrivacy();
 
-  const [buyTarget, setBuyTarget] = useState<Holding | null>(null);
+  const [buyTarget, setBuyTarget] = useState<{
+    holding: Holding;
+    kind: TransactionKind;
+  } | null>(null);
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
   const [detailTarget, setDetailTarget] = useState<EnrichedHolding | null>(
     null,
   );
-  const [editTarget, setEditTarget] = useState<EnrichedHolding | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
   const [tab, setTab] = useState<TabValue>('all');
 
@@ -406,7 +408,8 @@ export function Dashboard() {
 
       {/* Dialogs */}
       <BuyDialog
-        holding={buyTarget}
+        holding={buyTarget?.holding ?? null}
+        kind={buyTarget?.kind ?? 'buy'}
         open={!!buyTarget}
         onClose={() => setBuyTarget(null)}
         onConfirm={(next) => replaceHolding(next.id, next)}
@@ -428,9 +431,9 @@ export function Dashboard() {
         open={!!detailTarget}
         usdTwd={pricesQ.data?.usdTwd}
         onClose={() => setDetailTarget(null)}
-        onBuyClick={() => {
+        onAdHocBuyClick={() => {
           if (detailTarget) {
-            setBuyTarget(detailTarget);
+            setBuyTarget({ holding: detailTarget, kind: 'buy' });
             setDetailTarget(null);
           }
         }}
@@ -440,9 +443,9 @@ export function Dashboard() {
             setDetailTarget(null);
           }
         }}
-        onEditClick={() => {
+        onMonthlyDcaClick={() => {
           if (detailTarget) {
-            setEditTarget(detailTarget);
+            setBuyTarget({ holding: detailTarget, kind: 'monthly_dca' });
             setDetailTarget(null);
           }
         }}
@@ -450,15 +453,6 @@ export function Dashboard() {
           if (detailTarget && deleteHolding(detailTarget.id)) {
             setDetailTarget(null);
           }
-        }}
-      />
-      <HoldingEditSheet
-        holding={editTarget}
-        open={!!editTarget}
-        usdTwd={pricesQ.data?.usdTwd}
-        onClose={() => setEditTarget(null)}
-        onUpdate={(patch) => {
-          if (editTarget) updateHolding(editTarget.id, patch);
         }}
       />
     </main>

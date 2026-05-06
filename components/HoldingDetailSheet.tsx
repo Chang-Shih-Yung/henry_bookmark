@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, Pencil, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, Minus, AlertTriangle, Trash2, Repeat } from 'lucide-react';
 import type { EnrichedHolding, Transaction } from '@/lib/types';
 import {
   formatTwd,
@@ -28,9 +28,12 @@ type Props = {
   open: boolean;
   usdTwd: number | null | undefined;
   onClose: () => void;
-  onBuyClick: () => void;
+  /** 額外買入(非定期定額)。 */
+  onAdHocBuyClick: () => void;
+  /** 額外賣出。 */
   onSellClick: () => void;
-  onEditClick: () => void;
+  /** 新增一筆定期定額(會帶 monthly 預填)。 */
+  onMonthlyDcaClick: () => void;
   onDeleteClick: () => void;
 };
 
@@ -39,9 +42,9 @@ export function HoldingDetailSheet({
   open,
   usdTwd,
   onClose,
-  onBuyClick,
+  onAdHocBuyClick,
   onSellClick,
-  onEditClick,
+  onMonthlyDcaClick,
   onDeleteClick,
 }: Props) {
   const { privacy } = usePrivacy();
@@ -207,17 +210,8 @@ export function HoldingDetailSheet({
             </div>
           )}
 
-          {/* Power-user actions: 校正 + 刪除(離主動作遠,避免誤觸) */}
-          <div className="pt-6 pb-2 space-y-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onEditClick}
-              className="w-full gap-1.5 text-muted-foreground hover:text-foreground"
-            >
-              <Pencil className="h-4 w-4" />
-              校正總數(對不起來時手動修)
-            </Button>
+          {/* 刪除(離主動作遠,避免誤觸) */}
+          <div className="pt-6 pb-2">
             <Button
               variant="ghost"
               size="sm"
@@ -230,28 +224,37 @@ export function HoldingDetailSheet({
           </div>
         </div>
 
-        {/* ── Sticky bottom action bar ── */}
+        {/* ── Sticky bottom action bar(順序:額外買入 / 額外賣出 / 新增一筆定期定額)── */}
         <div
           className="border-t bg-popover shrink-0 grid grid-cols-3 gap-2 p-3"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
           <Button
+            variant="outline"
             size="lg"
-            onClick={onBuyClick}
-            className="gap-1.5 col-span-2"
+            onClick={onAdHocBuyClick}
+            className="gap-1.5 px-2"
           >
-            <Plus className="h-4 w-4" />
-            新增一筆
+            <Plus className="h-4 w-4 shrink-0" />
+            <span className="truncate">額外買入</span>
           </Button>
           <Button
             variant="outline"
             size="lg"
             onClick={onSellClick}
-            className="gap-1.5"
+            className="gap-1.5 px-2"
             disabled={holding.units <= 0}
           >
-            <Minus className="h-4 w-4" />
-            賣出
+            <Minus className="h-4 w-4 shrink-0" />
+            <span className="truncate">額外賣出</span>
+          </Button>
+          <Button
+            size="lg"
+            onClick={onMonthlyDcaClick}
+            className="gap-1.5 px-2"
+          >
+            <Repeat className="h-4 w-4 shrink-0" />
+            <span className="truncate">新增定期定額</span>
           </Button>
         </div>
       </SheetContent>

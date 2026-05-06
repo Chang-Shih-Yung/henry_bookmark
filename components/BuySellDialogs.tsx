@@ -12,29 +12,42 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Holding } from '@/lib/types';
+import type { Holding, TransactionKind } from '@/lib/types';
 import { applyBuy, applySell } from '@/lib/calc';
 import { formatTwd, formatUnits } from '@/lib/format';
 
 type BuyProps = {
   holding: Holding | null;
   open: boolean;
+  /** 'buy' = 額外買入(空表單);'monthly_dca' = 新增一筆定期定額(預填月扣金額)。 */
+  kind: TransactionKind;
   onClose: () => void;
   onConfirm: (next: Holding) => void;
 };
 
-export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
+export function BuyDialog({
+  holding,
+  open,
+  kind,
+  onClose,
+  onConfirm,
+}: BuyProps) {
   const [units, setUnits] = useState('');
   const [cost, setCost] = useState('');
+
+  const isMonthly = kind === 'monthly_dca';
 
   useEffect(() => {
     if (open && holding) {
       setUnits('');
-      // 預先填入月扣金額(TWD canonical),user 對著銀行 / 幣安微調
-      const monthly = holding.monthlyAutoBuyTwd ?? 0;
-      setCost(monthly > 0 ? String(monthly) : '');
+      if (isMonthly) {
+        const monthly = holding.monthlyAutoBuyTwd ?? 0;
+        setCost(monthly > 0 ? String(monthly) : '');
+      } else {
+        setCost('');
+      }
     }
-  }, [open, holding]);
+  }, [open, holding, isMonthly]);
 
   if (!holding) return null;
 
@@ -42,13 +55,8 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
     const u = Number(units);
     const c = Number(cost);
     if (!isFinite(u) || u <= 0 || !isFinite(c) || c < 0) return;
-    // 金額對得上月扣 → 標記為 monthly_dca,跟一般加買區分
-    const monthly = holding.monthlyAutoBuyTwd ?? 0;
-    const isMonthly = monthly > 0 && Math.abs(c - monthly) < 1;
     try {
-      onConfirm(
-        applyBuy(holding, u, c, undefined, isMonthly ? 'monthly_dca' : 'buy'),
-      );
+      onConfirm(applyBuy(holding, u, c, undefined, kind));
       onClose();
     } catch (e) {
       console.error(e);
@@ -57,15 +65,19 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
 
   const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
   const monthlyTwd = holding.monthlyAutoBuyTwd ?? 0;
+  const title = isMonthly ? '新增一筆定期定額' : '額外買入';
+  const description = isMonthly
+    ? '記錄這個月的定期定額扣款。金額已預填月扣,股數對著銀行 / 幣安抄。'
+    : '一次性的加買 / 加碼,跟定期定額分開記錄。';
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>新增一筆 — {holding.displayName}</DialogTitle>
-          <DialogDescription>
-            記錄這個月扣款 / 加買。對照銀行 / 幣安 app 抄股數,金額已預填月扣可微調。
-          </DialogDescription>
+          <DialogTitle>
+            {title} — {holding.displayName}
+          </DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -104,7 +116,7 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
               onChange={(e) => setCost(e.target.value)}
               className="text-base h-11"
             />
-            {monthlyTwd > 0 && (
+            {isMonthly && monthlyTwd > 0 && (
               <p className="text-xs text-muted-foreground mt-1.5">
                 已預填月扣 {formatTwd(monthlyTwd)}。實際扣款不同直接覆蓋。
               </p>
@@ -125,7 +137,12 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
   );
 }
 
-type SellProps = BuyProps;
+type SellProps = {
+  holding: Holding | null;
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (next: Holding) => void;
+};
 
 export function SellDialog({ holding, open, onClose, onConfirm }: SellProps) {
   const [units, setUnits] = useState('');
@@ -159,7 +176,7 @@ export function SellDialog({ holding, open, onClose, onConfirm }: SellProps) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>賣出 / 提領 — {holding.displayName}</DialogTitle>
+          <DialogTitle>額外賣出 — {holding.displayName}</DialogTitle>
           <DialogDescription>
             目前持有 {formatUnits(holding.units, holding.type)} · 平均成本{' '}
             {holding.units > 0
