@@ -1,20 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  MoreVertical,
-  Plus,
-  Minus,
-  Trash2,
-  AlertTriangle,
-  Pencil,
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { AlertTriangle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { EnrichedHolding } from '@/lib/types';
@@ -43,10 +30,7 @@ type Props = {
       React.ComponentProps<typeof HoldingEditSheet>['onUpdate']
     >[0],
   ) => void;
-  onDelete: () => void;
-  onBuyClick: () => void;
-  onSellClick: () => void;
-  /** 點 card 本體(非按鈕)→ 開詳情 sheet。 */
+  /** 點 card 本體(非按鈕)→ 開詳情 sheet。所有破壞性 / 加買賣動作走那邊。 */
   onCardClick: () => void;
 };
 
@@ -54,9 +38,6 @@ export function HoldingRow({
   holding,
   usdTwd,
   onUpdate,
-  onDelete,
-  onBuyClick,
-  onSellClick,
   onCardClick,
 }: Props) {
   const [editing, setEditing] = useState(false);
@@ -165,33 +146,6 @@ export function HoldingRow({
             {maskMoney(formatTwd(holding.marketValueTwd), privacy)}
           </div>
         </div>
-
-        {/* Menu */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="h-8 w-7 -mr-1 -mt-1 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-            aria-label="更多動作"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onBuyClick}>
-              <Plus className="mr-2 h-4 w-4" />
-              加買 / 加值
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onSellClick}>
-              <Minus className="mr-2 h-4 w-4" />
-              賣出 / 提領
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={onDelete}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              刪除
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* PnL pair: today + cumulative */}

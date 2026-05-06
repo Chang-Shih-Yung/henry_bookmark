@@ -95,11 +95,12 @@ export function Dashboard() {
     update({ ...holdingsQ.data, items });
   };
 
-  const deleteHolding = (id: string) => {
-    if (!holdingsQ.data) return;
-    if (!confirm('確定刪除這筆資產?')) return;
+  const deleteHolding = (id: string): boolean => {
+    if (!holdingsQ.data) return false;
+    if (!confirm('確定刪除這筆資產?所有交易紀錄會一起消失。')) return false;
     const items = holdingsQ.data.items.filter((h) => h.id !== id);
     update({ ...holdingsQ.data, items });
+    return true;
   };
 
   const addHolding = (h: Holding) => {
@@ -266,9 +267,6 @@ export function Dashboard() {
                   holding={h}
                   usdTwd={pricesQ.data?.usdTwd}
                   onUpdate={(patch) => updateHolding(h.id, patch)}
-                  onDelete={() => deleteHolding(h.id)}
-                  onBuyClick={() => setBuyTarget(h)}
-                  onSellClick={() => setSellTarget(h)}
                   onCardClick={() => setDetailTarget(h)}
                 />
               ))}
@@ -336,6 +334,11 @@ export function Dashboard() {
         onEditClick={() => {
           if (detailTarget) {
             setEditTarget(detailTarget);
+            setDetailTarget(null);
+          }
+        }}
+        onDeleteClick={() => {
+          if (detailTarget && deleteHolding(detailTarget.id)) {
             setDetailTarget(null);
           }
         }}

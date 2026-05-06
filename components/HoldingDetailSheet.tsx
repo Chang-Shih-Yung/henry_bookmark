@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, Pencil, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Pencil, AlertTriangle, Trash2 } from 'lucide-react';
 import type { EnrichedHolding, Transaction } from '@/lib/types';
 import {
   formatTwd,
@@ -31,6 +31,7 @@ type Props = {
   onBuyClick: () => void;
   onSellClick: () => void;
   onEditClick: () => void;
+  onDeleteClick: () => void;
 };
 
 export function HoldingDetailSheet({
@@ -41,6 +42,7 @@ export function HoldingDetailSheet({
   onBuyClick,
   onSellClick,
   onEditClick,
+  onDeleteClick,
 }: Props) {
   const { privacy } = usePrivacy();
 
@@ -204,6 +206,19 @@ export function HoldingDetailSheet({
               ))}
             </div>
           )}
+
+          {/* Danger zone — delete the whole holding */}
+          <div className="pt-6 pb-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDeleteClick}
+              className="w-full text-destructive hover:text-destructive hover:bg-destructive/5 gap-1.5"
+            >
+              <Trash2 className="h-4 w-4" />
+              刪除這筆資產
+            </Button>
+          </div>
         </div>
 
         {/* ── Sticky bottom action bar ── */}
