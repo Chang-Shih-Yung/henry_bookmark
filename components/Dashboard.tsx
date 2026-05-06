@@ -10,6 +10,13 @@ import {
   Eye,
   EyeOff,
   ChevronRight,
+  LayoutGrid,
+  Building2,
+  Globe,
+  Bitcoin,
+  Wallet,
+  Landmark,
+  type LucideIcon,
 } from 'lucide-react';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
 import { useHoldings, usePrices, useUpdateHoldings } from '@/lib/api';
@@ -44,27 +51,32 @@ type TabValue =
   | 'cash'
   | 'trust';
 
-const TABS: Array<{ value: TabValue; label: string; icon: string }> = [
-  { value: 'all', label: '全部', icon: '📊' },
-  { value: 'tw_stock', label: '台股', icon: '🇹🇼' },
-  { value: 'us_stock', label: '美股', icon: '🇺🇸' },
-  { value: 'crypto', label: '加密', icon: '₿' },
-  { value: 'cash', label: '現金', icon: '💵' },
-  { value: 'trust', label: '信託', icon: '🏦' },
+const TABS: Array<{ value: TabValue; label: string; Icon: LucideIcon }> = [
+  { value: 'all', label: '全部', Icon: LayoutGrid },
+  { value: 'tw_stock', label: '台股', Icon: Building2 },
+  { value: 'us_stock', label: '美股', Icon: Globe },
+  { value: 'crypto', label: '加密', Icon: Bitcoin },
+  { value: 'cash', label: '現金', Icon: Wallet },
+  { value: 'trust', label: '信託', Icon: Landmark },
 ];
 
 /** 「全部」分頁 → 點分類卡可跳到對應 tab。 */
 const TAB_SUMMARIES: Array<{
   tab: Exclude<TabValue, 'all'>;
   label: string;
-  icon: string;
+  Icon: LucideIcon;
   types: AssetType[];
 }> = [
-  { tab: 'tw_stock', label: '台股', icon: '🇹🇼', types: ['tw_stock'] },
-  { tab: 'us_stock', label: '美股', icon: '🇺🇸', types: ['us_stock'] },
-  { tab: 'crypto', label: '加密貨幣', icon: '₿', types: ['crypto'] },
-  { tab: 'cash', label: '現金', icon: '💵', types: ['cash_twd', 'cash_usd'] },
-  { tab: 'trust', label: '富邦信託', icon: '🏦', types: ['trust'] },
+  { tab: 'tw_stock', label: '台股', Icon: Building2, types: ['tw_stock'] },
+  { tab: 'us_stock', label: '美股', Icon: Globe, types: ['us_stock'] },
+  { tab: 'crypto', label: '加密貨幣', Icon: Bitcoin, types: ['crypto'] },
+  {
+    tab: 'cash',
+    label: '現金',
+    Icon: Wallet,
+    types: ['cash_twd', 'cash_usd'],
+  },
+  { tab: 'trust', label: '富邦信託', Icon: Landmark, types: ['trust'] },
 ];
 
 function tabMatches(tab: TabValue, type: AssetType): boolean {
@@ -269,13 +281,13 @@ export function Dashboard() {
                 type="button"
                 onClick={() => setTab(t.value)}
                 className={cn(
-                  'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                  'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
                   active
                     ? 'bg-foreground text-background'
                     : 'bg-muted text-muted-foreground hover:bg-muted/70',
                 )}
               >
-                <span>{t.icon}</span>
+                <t.Icon className="h-3.5 w-3.5" />
                 <span>{t.label}</span>
                 {count > 0 && (
                   <span
@@ -322,7 +334,9 @@ export function Dashboard() {
                     className="w-full flex items-center justify-between rounded-lg border border-border bg-card p-3.5 hover:bg-accent/30 active:bg-accent/50 transition-colors text-left"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-lg">{s.icon}</span>
+                      <div className="h-9 w-9 rounded-full bg-muted inline-flex items-center justify-center text-muted-foreground">
+                        <s.Icon className="h-4 w-4" />
+                      </div>
                       <div>
                         <div className="text-sm font-medium">{s.label}</div>
                         <div className="text-xs text-muted-foreground">
