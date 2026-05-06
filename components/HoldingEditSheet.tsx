@@ -197,6 +197,30 @@ export function HoldingEditSheet({
                 ≈ {formatTwd(Number(costInput) * fxRate)} (匯率 {fxRate.toFixed(2)})
               </p>
             )}
+            {(() => {
+              const u = Number(unitsInput);
+              const c = Number(costInput);
+              if (
+                !(
+                  holding.type === 'tw_stock' ||
+                  holding.type === 'us_stock' ||
+                  holding.type === 'crypto'
+                ) ||
+                !isFinite(u) ||
+                u <= 0 ||
+                !isFinite(c) ||
+                c <= 0
+              )
+                return null;
+              const avg = c / u;
+              const tag = holding.type === 'crypto' ? '顆' : '股';
+              return (
+                <p className="text-xs text-muted-foreground">
+                  成交均價 {isUsdNative ? formatUsd(avg) : formatTwd(avg)} /{' '}
+                  {tag}(對照銀行 / 幣安 app 校準用)
+                </p>
+              );
+            })()}
           </div>
 
           {/* Monthly */}

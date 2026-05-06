@@ -88,12 +88,30 @@ export function HoldingRow({
   const monthlyStr = isUsdNative
     ? formatUsd(monthlyAmount)
     : formatTwd(monthlyAmount);
+
+  // 成交均價 = 累計實付 ÷ 數量;只對股票 / 加密 才有意義
+  const showAvg =
+    (holding.type === 'tw_stock' ||
+      holding.type === 'us_stock' ||
+      holding.type === 'crypto') &&
+    holding.units > 0 &&
+    (isUsdNative ? costUsdView > 0 : holding.costBasisTwd > 0);
+  const avgBuyPrice = showAvg
+    ? isUsdNative
+      ? costUsdView / holding.units
+      : holding.costBasisTwd / holding.units
+    : 0;
+  const avgStr = isUsdNative
+    ? formatUsd(avgBuyPrice)
+    : formatTwd(avgBuyPrice);
+  const unitTag =
+    holding.type === 'crypto' ? '顆' : '股';
   const priceStr = formatPriceForDisplay(
     holding.currentPriceTwd,
     isUsdNative,
     fxRate,
   );
-  const unitTag =
+  const priceUnitTag =
     holding.type === 'crypto'
       ? '/ 顆'
       : holding.type === 'tw_stock' || holding.type === 'us_stock'
@@ -121,7 +139,7 @@ export function HoldingRow({
             <span className="font-mono">{holding.symbol}</span>
             {holding.currentPriceTwd !== null && (
               <span className="ml-2">
-                即時 {priceStr} {unitTag}
+                即時 {priceStr} {priceUnitTag}
               </span>
             )}
           </div>
@@ -191,19 +209,30 @@ export function HoldingRow({
             <span className="text-foreground font-medium tabular-nums">
               {formatUnits(holding.units, holding.type)}
             </span>{' '}
-            {unitLabelShort(holding.type)} · 已投入{' '}
+            {unitLabelShort(holding.type)}
+            {showAvg && (
+              <>
+                {' · 均價 '}
+                <span className="text-foreground tabular-nums">
+                  {avgStr} / {unitTag}
+                </span>
+              </>
+            )}
+          </div>
+          <div>
+            已投入{' '}
             <span className="text-foreground tabular-nums">
               {maskMoney(costStr, privacy)}
             </span>
+            {hasMonthly && (
+              <>
+                {' · 月扣 '}
+                <span className="text-foreground tabular-nums">
+                  {maskMoney(monthlyStr, privacy)}
+                </span>
+              </>
+            )}
           </div>
-          {hasMonthly && (
-            <div>
-              月扣{' '}
-              <span className="text-foreground tabular-nums">
-                {maskMoney(monthlyStr, privacy)}
-              </span>
-            </div>
-          )}
         </div>
         <div className="flex flex-col items-end gap-0.5">
           <Button
