@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { EnrichedHolding, Holding } from '@/lib/types';
-import { formatTwd, formatUsd } from '@/lib/format';
+import { formatTwd, formatUsd, formatPrice } from '@/lib/format';
 
 type Patch = Partial<
   Pick<
@@ -216,7 +216,7 @@ export function HoldingEditSheet({
               const tag = holding.type === 'crypto' ? '顆' : '股';
               return (
                 <p className="text-xs text-muted-foreground">
-                  成交均價 {isUsdNative ? formatUsd(avg) : formatTwd(avg)} /{' '}
+                  成交均價 {formatPrice(avg, isUsdNative ? 'USD' : 'TWD')} /{' '}
                   {tag}(對照銀行 / 幣安 app 校準用)
                 </p>
               );
@@ -267,7 +267,7 @@ export function formatPriceForDisplay(
 ): string {
   if (priceTwd === null) return '—';
   if (isUsdNative && fxRate > 0) {
-    return formatUsd(priceTwd / fxRate);
+    return formatPrice(priceTwd / fxRate, 'USD');
   }
-  return formatTwd(priceTwd);
+  return formatPrice(priceTwd, 'TWD');
 }

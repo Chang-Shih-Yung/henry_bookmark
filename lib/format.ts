@@ -91,3 +91,16 @@ export function formatUsd(n: number): string {
   if (!isFinite(n)) return '—';
   return `$ ${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 }
+
+/**
+ * 每單位的「價格」(成交均價、即時價、漲跌參考價)。永遠保留 2 位小數,
+ * 不四捨五入到整數 — 70.73 就顯示 70.73。
+ * 千分位照當地慣例:USD 用 en-US,TWD 用 zh-TW。
+ */
+export function formatPrice(n: number, currency: 'TWD' | 'USD'): string {
+  if (!isFinite(n)) return '—';
+  if (currency === 'USD') {
+    return `$ ${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  }
+  return `NT$ ${n.toLocaleString('zh-TW', { maximumFractionDigits: 2 })}`;
+}

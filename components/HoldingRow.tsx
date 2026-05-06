@@ -25,6 +25,7 @@ import {
   formatUsd,
   formatChange,
   formatUpdatedAt,
+  formatPrice,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
@@ -101,9 +102,7 @@ export function HoldingRow({
       ? costUsdView / holding.units
       : holding.costBasisTwd / holding.units
     : 0;
-  const avgStr = isUsdNative
-    ? formatUsd(avgBuyPrice)
-    : formatTwd(avgBuyPrice);
+  const avgStr = formatPrice(avgBuyPrice, isUsdNative ? 'USD' : 'TWD');
   const unitTag =
     holding.type === 'crypto' ? '顆' : '股';
   const priceStr = formatPriceForDisplay(
@@ -212,7 +211,7 @@ export function HoldingRow({
             {unitLabelShort(holding.type)}
             {showAvg && (
               <>
-                {' · 均價 '}
+                {' · 成交均價 '}
                 <span className="text-foreground tabular-nums">
                   {avgStr} / {unitTag}
                 </span>
