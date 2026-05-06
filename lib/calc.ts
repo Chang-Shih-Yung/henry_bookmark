@@ -27,6 +27,7 @@ export function enrichHolding(
   prices: Prices,
 ): EnrichedHolding {
   const priceTwd = lookupPriceTwd(holding, prices);
+  const prevPriceTwd = lookupPrevPriceTwd(holding, prices);
   const hasPriceFallback = priceTwd === null;
 
   const marketValueTwd = hasPriceFallback
@@ -37,6 +38,16 @@ export function enrichHolding(
   const unrealizedPnlPct =
     holding.costBasisTwd > 0 ? unrealizedPnlTwd / holding.costBasisTwd : 0;
 
+  // 今日漲跌:用同檔的 current vs prev,純反映該檔價格變化(不含 FX)
+  const todayChangeTwd =
+    priceTwd !== null && prevPriceTwd !== null
+      ? holding.units * (priceTwd - prevPriceTwd)
+      : 0;
+  const todayChangePct =
+    priceTwd !== null && prevPriceTwd !== null && prevPriceTwd > 0
+      ? (priceTwd - prevPriceTwd) / prevPriceTwd
+      : null;
+
   return {
     ...holding,
     currentPriceTwd: priceTwd,
@@ -44,6 +55,9 @@ export function enrichHolding(
     unrealizedPnlTwd,
     unrealizedPnlPct,
     hasPriceFallback,
+    prevPriceTwd,
+    todayChangeTwd,
+    todayChangePct,
   };
 }
 
@@ -72,6 +86,31 @@ function lookupPriceTwd(holding: Holding, prices: Prices): number | null {
       return prices.usdTwd;
     case 'trust':
       // 無公開即時價,fallback 用 costBasis(回 null 觸發 fallback 路徑)
+      return null;
+  }
+}
+
+/** 對應 lookupPriceTwd 的 prev 版本。沒 prev 資料就回 null,enrichHolding 會把今日漲跌設 0。 */
+function lookupPrevPriceTwd(holding: Holding, prices: Prices): number | null {
+  switch (holding.type) {
+    case 'tw_stock':
+      if (holding.symbol === '2330.TW') return prices.tsmcPrev;
+      if (holding.symbol === '0050.TW') return prices.etf0050Prev;
+      return null;
+    case 'us_stock':
+      if (holding.symbol === 'GOOGL') return prices.googlPrev;
+      if (holding.symbol === 'VTI') return prices.vtiPrev;
+      return null;
+    case 'crypto':
+      if (holding.symbol === 'BTC') return prices.btcPrev;
+      if (holding.symbol === 'ETH') return prices.ethPrev;
+      if (holding.symbol === 'ADA') return prices.adaPrev;
+      if (holding.symbol === 'DOGE') return prices.dogePrev;
+      return null;
+    case 'cash_twd':
+    case 'cash_usd':
+    case 'trust':
+      // 現金 / 信託沒有「漲跌」概念
       return null;
   }
 }
@@ -143,10 +182,12 @@ export function computeSummary(
 
   let totalAssetTwd = 0;
   let totalCostBasisTwd = 0;
+  let totalTodayChangeTwd = 0;
 
   for (const h of enriched) {
     totalAssetTwd += h.marketValueTwd;
     totalCostBasisTwd += h.costBasisTwd;
+    totalTodayChangeTwd += h.todayChangeTwd;
     byType[h.type].value += h.marketValueTwd;
     byType[h.type].count += 1;
   }
@@ -158,6 +199,9 @@ export function computeSummary(
   const totalUnrealizedPnlTwd = totalAssetTwd - totalCostBasisTwd;
   const totalUnrealizedPnlPct =
     totalCostBasisTwd > 0 ? totalUnrealizedPnlTwd / totalCostBasisTwd : 0;
+  const yesterdayTotal = totalAssetTwd - totalTodayChangeTwd;
+  const totalTodayChangePct =
+    yesterdayTotal > 0 ? totalTodayChangeTwd / yesterdayTotal : 0;
   const goalProgressPct = goalTwd > 0 ? totalAssetTwd / goalTwd : 0;
 
   return {
@@ -165,6 +209,8 @@ export function computeSummary(
     totalCostBasisTwd,
     totalUnrealizedPnlTwd,
     totalUnrealizedPnlPct,
+    totalTodayChangeTwd,
+    totalTodayChangePct,
     byType,
     goalProgressPct,
   };

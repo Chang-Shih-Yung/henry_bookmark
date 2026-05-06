@@ -26,7 +26,7 @@ import { AllocationPie } from '@/components/AllocationPie';
 import { HoldingRow } from '@/components/HoldingRow';
 import { BuyDialog, SellDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
-import { formatPct, formatTwd } from '@/lib/format';
+import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -145,19 +145,32 @@ export function Dashboard() {
           twd={summary.totalAssetTwd}
           className="text-5xl font-bold font-display tracking-tight block text-foreground"
         />
-        <div
-          className={cn(
-            'text-sm tabular-nums',
-            summary.totalCostBasisTwd === 0
-              ? 'text-muted-foreground'
-              : summary.totalUnrealizedPnlTwd >= 0
-                ? 'text-up'
-                : 'text-down',
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm tabular-nums">
+          <span
+            className={cn(
+              summary.totalCostBasisTwd === 0
+                ? 'text-muted-foreground'
+                : summary.totalUnrealizedPnlTwd >= 0
+                  ? 'text-up'
+                  : 'text-down',
+            )}
+          >
+            {summary.totalCostBasisTwd === 0
+              ? '尚無成本資料'
+              : `累計 ${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${formatTwd(summary.totalUnrealizedPnlTwd)})`}
+          </span>
+          {summary.totalTodayChangeTwd !== 0 && (
+            <span
+              className={cn(
+                'text-xs',
+                summary.totalTodayChangeTwd >= 0 ? 'text-up' : 'text-down',
+              )}
+            >
+              今日 {summary.totalTodayChangeTwd >= 0 ? '▲' : '▼'}{' '}
+              {formatPct(summary.totalTodayChangePct)} (
+              {formatChange(summary.totalTodayChangeTwd)})
+            </span>
           )}
-        >
-          {summary.totalCostBasisTwd === 0
-            ? '尚無成本資料'
-            : `${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${formatTwd(summary.totalUnrealizedPnlTwd)})`}
         </div>
         <Progress
           value={Math.min(summary.goalProgressPct * 100, 100)}

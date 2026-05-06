@@ -1,7 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { MoreVertical, Plus, Minus, Trash2, AlertTriangle } from 'lucide-react';
+import {
+  MoreVertical,
+  Plus,
+  Minus,
+  Trash2,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +25,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import type { EnrichedHolding, Holding } from '@/lib/types';
-import { formatTwd, formatPct, formatUnits, formatUsd } from '@/lib/format';
+import {
+  formatTwd,
+  formatPct,
+  formatUnits,
+  formatUsd,
+  formatChange,
+} from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -57,6 +71,7 @@ export function HoldingRow({
   const [editingUnits, setEditingUnits] = useState(false);
   const [editingCost, setEditingCost] = useState(false);
   const [editingMonthly, setEditingMonthly] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const isUsdNative = isUsdNativeType(holding.type);
   const fxRate = usdTwd ?? 0;
@@ -182,8 +197,13 @@ export function HoldingRow({
       : `月扣 ${formatTwd(monthlyAmount)}`
     : '+ 月扣';
 
+  // 今日漲跌資料是否可顯示(現金 / 信託沒有 prev → 不展開)
+  const hasTodayChange = holding.todayChangePct !== null;
+  const todayPositive = (holding.todayChangePct ?? 0) >= 0;
+
   return (
-    <div className="flex items-center justify-between gap-2 py-2 px-1 border-b border-border/50 last:border-b-0">
+    <div className="border-b border-border/50 last:border-b-0">
+      <div className="flex items-center justify-between gap-2 py-2 px-1">
       {/* Left: name + units · cost · monthly */}
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -387,6 +407,22 @@ export function HoldingRow({
         </span>
       </div>
 
+      {/* Expand toggle (only when we have today's change data) */}
+      {hasTodayChange && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="h-8 w-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={expanded ? '收起今日明細' : '展開今日明細'}
+        >
+          {expanded ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </button>
+      )}
+
       {/* Menu */}
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -413,6 +449,63 @@ export function HoldingRow({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
+
+      {/* Expanded: today's change vs cumulative PnL */}
+      {expanded && hasTodayChange && (
+        <div className="px-1 pb-2 pt-0.5 grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-md border border-border/40 bg-muted/30 p-2">
+            <div className="text-muted-foreground text-[10px]">今日</div>
+            <div
+              className={cn(
+                'tabular-nums font-medium',
+                todayPositive ? 'text-up' : 'text-down',
+              )}
+            >
+              {todayPositive ? '▲' : '▼'} {formatPct(holding.todayChangePct ?? 0)}
+            </div>
+            <div
+              className={cn(
+                'tabular-nums text-[11px]',
+                todayPositive ? 'text-up' : 'text-down',
+              )}
+            >
+              {formatChange(holding.todayChangeTwd)}
+            </div>
+          </div>
+          <div className="rounded-md border border-border/40 bg-muted/30 p-2">
+            <div className="text-muted-foreground text-[10px]">自買進累計</div>
+            <div
+              className={cn(
+                'tabular-nums font-medium',
+                holding.costBasisTwd === 0
+                  ? 'text-muted-foreground'
+                  : pnlPositive
+                    ? 'text-up'
+                    : 'text-down',
+              )}
+            >
+              {holding.costBasisTwd === 0
+                ? '—'
+                : `${pnlPositive ? '▲' : '▼'} ${formatPct(holding.unrealizedPnlPct)}`}
+            </div>
+            <div
+              className={cn(
+                'tabular-nums text-[11px]',
+                holding.costBasisTwd === 0
+                  ? 'text-muted-foreground'
+                  : pnlPositive
+                    ? 'text-up'
+                    : 'text-down',
+              )}
+            >
+              {holding.costBasisTwd === 0
+                ? '—'
+                : formatChange(holding.unrealizedPnlTwd)}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

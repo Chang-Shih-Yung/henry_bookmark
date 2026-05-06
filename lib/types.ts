@@ -73,16 +73,28 @@ export type Config = {
 /**
  * /api/prices 內部用的純價格資料(TWD per unit)。
  * us stocks 已在 server side 用即時 USD/TWD 換算成 TWD per share。
+ *
+ * `*Prev` = 昨日收盤(stocks)/ 24 小時前(crypto),都是 TWD per unit。
+ * 為了讓「今日漲跌」純反映該檔的價格變化(不被 FX 變動污染),美股的
+ * prev 在 server 用「同一支當下的 usdTwd」換算,而非昨日 FX。
  */
 export type Prices = {
   tsmc: number | null;
+  tsmcPrev: number | null;
   etf0050: number | null;
+  etf0050Prev: number | null;
   googl: number | null;
+  googlPrev: number | null;
   vti: number | null;
+  vtiPrev: number | null;
   btc: number | null;
+  btcPrev: number | null;
   eth: number | null;
+  ethPrev: number | null;
   ada: number | null;
+  adaPrev: number | null;
   doge: number | null;
+  dogePrev: number | null;
   usdTwd: number | null;
   fetchedAt: string;
 };
@@ -108,6 +120,12 @@ export type EnrichedHolding = Holding & {
   unrealizedPnlTwd: number;
   unrealizedPnlPct: number; // 0.05 = +5%
   hasPriceFallback: boolean; // true 表示用 costBasis 估算,而非真實即時價
+  /** 昨日收盤的 TWD per unit;null = 沒拿到 prev / 無法計算。 */
+  prevPriceTwd: number | null;
+  /** 今日該檔對你部位的 TWD 漲跌(units × (price - prev))。 */
+  todayChangeTwd: number;
+  /** 今日該檔的價格漲跌幅(0.012 = +1.2%);null = 沒 prev 值。 */
+  todayChangePct: number | null;
 };
 
 export type PortfolioSummary = {
@@ -115,6 +133,10 @@ export type PortfolioSummary = {
   totalCostBasisTwd: number;
   totalUnrealizedPnlTwd: number;
   totalUnrealizedPnlPct: number;
+  /** 今日整體 TWD 漲跌(各檔 todayChangeTwd 加總)。 */
+  totalTodayChangeTwd: number;
+  /** 今日整體漲跌幅(相對於昨日總資產)。 */
+  totalTodayChangePct: number;
   byType: Record<AssetType, { value: number; pct: number; count: number }>;
   goalProgressPct: number; // totalAssetTwd / config.goalTwd
 };
