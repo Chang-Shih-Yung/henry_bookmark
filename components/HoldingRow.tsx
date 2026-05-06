@@ -1,8 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { AlertTriangle, Pencil } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { EnrichedHolding } from '@/lib/types';
 import {
@@ -17,7 +15,6 @@ import {
 import { cn } from '@/lib/utils';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
 import {
-  HoldingEditSheet,
   isUsdNativeType,
   formatPriceForDisplay,
 } from '@/components/HoldingEditSheet';
@@ -25,22 +22,11 @@ import {
 type Props = {
   holding: EnrichedHolding;
   usdTwd: number | null | undefined;
-  onUpdate: (
-    next: Parameters<
-      React.ComponentProps<typeof HoldingEditSheet>['onUpdate']
-    >[0],
-  ) => void;
-  /** 點 card 本體(非按鈕)→ 開詳情 sheet。所有破壞性 / 加買賣動作走那邊。 */
+  /** 點 card 本體 → 開詳情 sheet。所有編輯 / 加買賣 / 刪除都在那裡。 */
   onCardClick: () => void;
 };
 
-export function HoldingRow({
-  holding,
-  usdTwd,
-  onUpdate,
-  onCardClick,
-}: Props) {
-  const [editing, setEditing] = useState(false);
+export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
   const { privacy } = usePrivacy();
 
   const isUsdNative = isUsdNativeType(holding.type);
@@ -101,21 +87,10 @@ export function HoldingRow({
         ? '/ 股'
         : '';
 
-  // 點 card 本體開詳情;真按鈕(dropdown / 編輯)會 stopPropagation 避開
-  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (
-      e.target instanceof HTMLElement &&
-      e.target.closest('button, [role="menu"], [role="menuitem"]')
-    ) {
-      return;
-    }
-    onCardClick();
-  };
-
   return (
     <div
       className="rounded-lg border border-border bg-card p-3.5 space-y-3 shadow-sm cursor-pointer active:bg-accent/30 transition-colors"
-      onClick={handleCardClick}
+      onClick={onCardClick}
     >
       {/* Header: name + market value */}
       <div className="flex items-start justify-between gap-2">
@@ -204,29 +179,10 @@ export function HoldingRow({
             )}
           </div>
         </div>
-        <div className="flex flex-col items-end gap-0.5">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-8 px-2.5 gap-1.5 text-xs"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            編輯
-          </Button>
-          <span className="text-[10px] text-muted-foreground/70 tabular-nums">
-            上次更新 {formatUpdatedAt(holding.updatedAt)}
-          </span>
-        </div>
+        <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0 self-end">
+          上次更新 {formatUpdatedAt(holding.updatedAt)}
+        </span>
       </div>
-
-      <HoldingEditSheet
-        holding={editing ? holding : null}
-        open={editing}
-        usdTwd={usdTwd}
-        onClose={() => setEditing(false)}
-        onUpdate={onUpdate}
-      />
     </div>
   );
 }

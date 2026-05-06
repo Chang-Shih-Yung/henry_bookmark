@@ -28,20 +28,27 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
   const [cost, setCost] = useState('');
 
   useEffect(() => {
-    if (open) {
+    if (open && holding) {
       setUnits('');
-      setCost('');
+      // 預先填入月扣金額(TWD canonical),user 對著銀行 / 幣安微調
+      const monthly = holding.monthlyAutoBuyTwd ?? 0;
+      setCost(monthly > 0 ? String(monthly) : '');
     }
-  }, [open]);
+  }, [open, holding]);
 
   if (!holding) return null;
 
   const handle = () => {
     const u = Number(units);
     const c = Number(cost);
-    if (!isFinite(u) || u < 0 || !isFinite(c) || c < 0) return;
+    if (!isFinite(u) || u <= 0 || !isFinite(c) || c < 0) return;
+    // 金額對得上月扣 → 標記為 monthly_dca,跟一般加買區分
+    const monthly = holding.monthlyAutoBuyTwd ?? 0;
+    const isMonthly = monthly > 0 && Math.abs(c - monthly) < 1;
     try {
-      onConfirm(applyBuy(holding, u, c));
+      onConfirm(
+        applyBuy(holding, u, c, undefined, isMonthly ? 'monthly_dca' : 'buy'),
+      );
       onClose();
     } catch (e) {
       console.error(e);
@@ -49,21 +56,22 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
   };
 
   const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
+  const monthlyTwd = holding.monthlyAutoBuyTwd ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>加買 / 加值 — {holding.displayName}</DialogTitle>
+          <DialogTitle>新增一筆 — {holding.displayName}</DialogTitle>
           <DialogDescription>
-            目前持有 {formatUnits(holding.units, holding.type)} · 已投入 {formatTwd(holding.costBasisTwd)}
+            記錄這個月扣款 / 加買。對照銀行 / 幣安 app 抄股數,金額已預填月扣可微調。
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div>
             <Label htmlFor="buy-units">
-              {isCash ? '存入金額' : '加買數量'}
+              {isCash ? '存入金額' : '本次加買數量'}
               {holding.type === 'cash_usd' ? '(USD)' : ''}
             </Label>
             <Input
@@ -73,12 +81,19 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
               step="any"
               value={units}
               onChange={(e) => setUnits(e.target.value)}
-              autoFocus
+              placeholder={
+                holding.type === 'crypto'
+                  ? '例如 12.345'
+                  : holding.type === 'us_stock'
+                    ? '例如 0.298'
+                    : '例如 85'
+              }
+              className="text-base h-11"
             />
           </div>
           <div>
             <Label htmlFor="buy-cost">
-              實付金額(TWD,扣手續費後)
+              本次扣款金額(TWD,扣手續費後)
             </Label>
             <Input
               id="buy-cost"
@@ -87,15 +102,23 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
               step="any"
               value={cost}
               onChange={(e) => setCost(e.target.value)}
+              className="text-base h-11"
             />
+            {monthlyTwd > 0 && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                已預填月扣 {formatTwd(monthlyTwd)}。實際扣款不同直接覆蓋。
+              </p>
+            )}
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={handle}>確認</Button>
+          <Button onClick={handle} disabled={!Number(units) || !Number(cost)}>
+            確認
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

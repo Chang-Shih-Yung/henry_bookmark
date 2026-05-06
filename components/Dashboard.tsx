@@ -384,7 +384,6 @@ export function Dashboard() {
                   key={h.id}
                   holding={h}
                   usdTwd={pricesQ.data?.usdTwd}
-                  onUpdate={(patch) => updateHolding(h.id, patch)}
                   onCardClick={() => setDetailTarget(h)}
                 />
               ))

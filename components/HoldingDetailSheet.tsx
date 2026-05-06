@@ -207,8 +207,17 @@ export function HoldingDetailSheet({
             </div>
           )}
 
-          {/* Danger zone — delete the whole holding */}
-          <div className="pt-6 pb-2">
+          {/* Power-user actions: 校正 + 刪除(離主動作遠,避免誤觸) */}
+          <div className="pt-6 pb-2 space-y-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEditClick}
+              className="w-full gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+              校正總數(對不起來時手動修)
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -227,13 +236,12 @@ export function HoldingDetailSheet({
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
           <Button
-            variant="outline"
             size="lg"
             onClick={onBuyClick}
-            className="gap-1.5"
+            className="gap-1.5 col-span-2"
           >
             <Plus className="h-4 w-4" />
-            加買
+            新增一筆
           </Button>
           <Button
             variant="outline"
@@ -244,10 +252,6 @@ export function HoldingDetailSheet({
           >
             <Minus className="h-4 w-4" />
             賣出
-          </Button>
-          <Button size="lg" onClick={onEditClick} className="gap-1.5">
-            <Pencil className="h-4 w-4" />
-            校正
           </Button>
         </div>
       </SheetContent>
