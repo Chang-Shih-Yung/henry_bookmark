@@ -45,6 +45,38 @@ export type Holding = {
 
   notes?: string;
   updatedAt: string; // ISO 8601
+
+  /**
+   * Append-only 交易紀錄(每次加買 / 賣出 / 月扣 / 校正都 push 一筆)。
+   * units / costBasisTwd 是當下的「累計快取」,真正 source of truth 是 transactions 加總。
+   * 既有資料沒這欄等於空陣列。
+   */
+  transactions?: Transaction[];
+};
+
+export type TransactionKind =
+  | 'buy' // 一般加買(BuyDialog)
+  | 'sell' // 一般賣出(SellDialog)
+  | 'monthly_dca' // 月扣(自動 / 手動觸發)
+  | 'manual_adjust' // 手動校正總數(從 edit sheet 推出)
+  | 'initial'; // 初始記錄
+
+export type Transaction = {
+  id: string;
+  kind: TransactionKind;
+  /** 數量增減(+ 是加買,- 是賣出 / 校正減量)。 */
+  unitsDelta: number;
+  /** TWD 投入增減(canonical,正負同 unitsDelta 方向)。 */
+  costDeltaTwd: number;
+  /** USD-native 類型才有值。 */
+  costDeltaUsd?: number;
+  /** 該次成交均價(TWD per unit),選填。 */
+  pricePerUnitTwd?: number;
+  /** 實際發生日(扣款 / 成交日)。 */
+  occurredAt: string; // ISO 8601
+  /** keyin 進系統的時間。 */
+  recordedAt: string; // ISO 8601
+  notes?: string;
 };
 
 export type Holdings = {

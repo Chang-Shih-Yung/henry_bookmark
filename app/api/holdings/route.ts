@@ -4,6 +4,18 @@ import { defaultHoldings } from '@/lib/defaultHoldings';
 import type { Holdings } from '@/lib/types';
 import { z } from 'zod';
 
+const TransactionSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['buy', 'sell', 'monthly_dca', 'manual_adjust', 'initial']),
+  unitsDelta: z.number(),
+  costDeltaTwd: z.number(),
+  costDeltaUsd: z.number().optional(),
+  pricePerUnitTwd: z.number().optional(),
+  occurredAt: z.string(),
+  recordedAt: z.string(),
+  notes: z.string().optional(),
+});
+
 const HoldingSchema = z.object({
   id: z.string(),
   type: z.enum(['tw_stock', 'us_stock', 'crypto', 'cash_twd', 'cash_usd', 'trust']),
@@ -17,6 +29,7 @@ const HoldingSchema = z.object({
   monthlyAutoBuyUsd: z.number().nonnegative().optional(),
   notes: z.string().optional(),
   updatedAt: z.string(),
+  transactions: z.array(TransactionSchema).optional(),
 });
 
 const HoldingsSchema = z.object({

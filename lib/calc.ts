@@ -8,6 +8,8 @@ import type {
   Scenario,
   SimulationResult,
   SimulationYear,
+  Transaction,
+  TransactionKind,
 } from './types';
 
 /**
@@ -115,16 +117,28 @@ function lookupPrevPriceTwd(holding: Holding, prices: Prices): number | null {
   }
 }
 
-/** 加買:簡單加總 units 跟 costBasis,不更動其他欄位。 */
+/**
+ * 加買:加總 units / costBasis,並 append 一筆交易紀錄。
+ * kind 預設 'buy';月扣呼叫時傳 'monthly_dca'。
+ */
 export function applyBuy(
   holding: Holding,
   addUnits: number,
   addCostTwd: number,
   addCostUsd?: number,
+  kind: TransactionKind = 'buy',
+  occurredAt?: string,
 ): Holding {
   if (addUnits < 0 || addCostTwd < 0) {
     throw new Error('applyBuy: addUnits 與 addCostTwd 必須非負');
   }
+  const tx = makeTransaction({
+    kind,
+    unitsDelta: addUnits,
+    costDeltaTwd: addCostTwd,
+    costDeltaUsd: addCostUsd,
+    occurredAt,
+  });
   return {
     ...holding,
     units: holding.units + addUnits,
@@ -132,13 +146,42 @@ export function applyBuy(
     ...(addCostUsd != null
       ? { costBasisUsd: (holding.costBasisUsd ?? 0) + addCostUsd }
       : {}),
+    transactions: [...(holding.transactions ?? []), tx],
     updatedAt: new Date().toISOString(),
   };
 }
 
+/** 建一筆 Transaction;deltas 都用 caller 傳的方向。 */
+export function makeTransaction(args: {
+  kind: TransactionKind;
+  unitsDelta: number;
+  costDeltaTwd: number;
+  costDeltaUsd?: number;
+  pricePerUnitTwd?: number;
+  occurredAt?: string;
+  notes?: string;
+}): Transaction {
+  const now = new Date().toISOString();
+  const pricePerUnitTwd =
+    args.pricePerUnitTwd ??
+    (Math.abs(args.unitsDelta) > 0
+      ? Math.abs(args.costDeltaTwd) / Math.abs(args.unitsDelta)
+      : undefined);
+  return {
+    id: crypto.randomUUID(),
+    kind: args.kind,
+    unitsDelta: args.unitsDelta,
+    costDeltaTwd: args.costDeltaTwd,
+    costDeltaUsd: args.costDeltaUsd,
+    pricePerUnitTwd,
+    occurredAt: args.occurredAt ?? now,
+    recordedAt: now,
+    notes: args.notes,
+  };
+}
+
 /**
- * 賣出:用平均成本扣除 costBasis,差額累積到 realizedPnlTwd。
- * 若 sellUnits > holding.units 會 throw。
+ * 賣出:用平均成本扣除 costBasis,差額累積到 realizedPnlTwd,並 append 交易紀錄。
  */
 export function applySell(
   holding: Holding,
@@ -157,11 +200,20 @@ export function applySell(
   const costRemoved = avgCost * sellUnits;
   const realizedDelta = recvTwd - costRemoved;
 
+  const tx = makeTransaction({
+    kind: 'sell',
+    unitsDelta: -sellUnits,
+    costDeltaTwd: -costRemoved,
+    pricePerUnitTwd: sellUnits > 0 ? recvTwd / sellUnits : undefined,
+    notes: `已實現 ${realizedDelta >= 0 ? '+' : ''}${Math.round(realizedDelta)} TWD`,
+  });
+
   return {
     ...holding,
     units: holding.units - sellUnits,
     costBasisTwd: holding.costBasisTwd - costRemoved,
     realizedPnlTwd: (holding.realizedPnlTwd ?? 0) + realizedDelta,
+    transactions: [...(holding.transactions ?? []), tx],
     updatedAt: new Date().toISOString(),
   };
 }

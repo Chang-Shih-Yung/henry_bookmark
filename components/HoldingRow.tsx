@@ -46,6 +46,8 @@ type Props = {
   onDelete: () => void;
   onBuyClick: () => void;
   onSellClick: () => void;
+  /** 點 card 本體(非按鈕)→ 開詳情 sheet。 */
+  onCardClick: () => void;
 };
 
 export function HoldingRow({
@@ -55,6 +57,7 @@ export function HoldingRow({
   onDelete,
   onBuyClick,
   onSellClick,
+  onCardClick,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const { privacy } = usePrivacy();
@@ -117,8 +120,22 @@ export function HoldingRow({
         ? '/ 股'
         : '';
 
+  // 點 card 本體開詳情;真按鈕(dropdown / 編輯)會 stopPropagation 避開
+  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (
+      e.target instanceof HTMLElement &&
+      e.target.closest('button, [role="menu"], [role="menuitem"]')
+    ) {
+      return;
+    }
+    onCardClick();
+  };
+
   return (
-    <div className="rounded-lg border border-border bg-card p-3.5 space-y-3 shadow-sm">
+    <div
+      className="rounded-lg border border-border bg-card p-3.5 space-y-3 shadow-sm cursor-pointer active:bg-accent/30 transition-colors"
+      onClick={handleCardClick}
+    >
       {/* Header: name + market value */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">

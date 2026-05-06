@@ -27,6 +27,8 @@ import { Badge } from '@/components/ui/badge';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { AllocationPie } from '@/components/AllocationPie';
 import { HoldingRow } from '@/components/HoldingRow';
+import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
+import { HoldingEditSheet } from '@/components/HoldingEditSheet';
 import { BuyDialog, SellDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
 import { formatPct, formatTwd, formatChange } from '@/lib/format';
@@ -50,6 +52,10 @@ export function Dashboard() {
 
   const [buyTarget, setBuyTarget] = useState<Holding | null>(null);
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
+  const [detailTarget, setDetailTarget] = useState<EnrichedHolding | null>(
+    null,
+  );
+  const [editTarget, setEditTarget] = useState<EnrichedHolding | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
 
   const enriched: EnrichedHolding[] = useMemo(() => {
@@ -263,6 +269,7 @@ export function Dashboard() {
                   onDelete={() => deleteHolding(h.id)}
                   onBuyClick={() => setBuyTarget(h)}
                   onSellClick={() => setSellTarget(h)}
+                  onCardClick={() => setDetailTarget(h)}
                 />
               ))}
               <Button
@@ -308,6 +315,39 @@ export function Dashboard() {
         open={!!newType}
         onClose={() => setNewType(null)}
         onConfirm={addHolding}
+      />
+      <HoldingDetailSheet
+        holding={detailTarget}
+        open={!!detailTarget}
+        usdTwd={pricesQ.data?.usdTwd}
+        onClose={() => setDetailTarget(null)}
+        onBuyClick={() => {
+          if (detailTarget) {
+            setBuyTarget(detailTarget);
+            setDetailTarget(null);
+          }
+        }}
+        onSellClick={() => {
+          if (detailTarget) {
+            setSellTarget(detailTarget);
+            setDetailTarget(null);
+          }
+        }}
+        onEditClick={() => {
+          if (detailTarget) {
+            setEditTarget(detailTarget);
+            setDetailTarget(null);
+          }
+        }}
+      />
+      <HoldingEditSheet
+        holding={editTarget}
+        open={!!editTarget}
+        usdTwd={pricesQ.data?.usdTwd}
+        onClose={() => setEditTarget(null)}
+        onUpdate={(patch) => {
+          if (editTarget) updateHolding(editTarget.id, patch);
+        }}
       />
     </main>
   );

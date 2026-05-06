@@ -12,8 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { EnrichedHolding, Holding } from '@/lib/types';
+import type { EnrichedHolding, Holding, Transaction } from '@/lib/types';
 import { formatTwd, formatUsd, formatPrice } from '@/lib/format';
+import { makeTransaction } from '@/lib/calc';
 
 type Patch = Partial<
   Pick<
@@ -23,6 +24,7 @@ type Patch = Partial<
     | 'costBasisUsd'
     | 'monthlyAutoBuyTwd'
     | 'monthlyAutoBuyUsd'
+    | 'transactions'
   >
 >;
 
@@ -141,6 +143,29 @@ export function HoldingEditSheet({
           patch.monthlyAutoBuyTwd = m;
         }
       }
+    }
+
+    // 數量或成本有變動 → log 一筆 manual_adjust 紀錄
+    const unitsDelta =
+      patch.units != null ? patch.units - holding.units : 0;
+    const costDeltaTwd =
+      patch.costBasisTwd != null
+        ? patch.costBasisTwd - holding.costBasisTwd
+        : 0;
+    const costDeltaUsd =
+      patch.costBasisUsd != null
+        ? patch.costBasisUsd - (holding.costBasisUsd ?? 0)
+        : undefined;
+
+    if (unitsDelta !== 0 || costDeltaTwd !== 0) {
+      const tx: Transaction = makeTransaction({
+        kind: 'manual_adjust',
+        unitsDelta,
+        costDeltaTwd,
+        costDeltaUsd,
+        notes: '手動校正總數',
+      });
+      patch.transactions = [...(holding.transactions ?? []), tx];
     }
 
     if (Object.keys(patch).length > 0) onUpdate(patch);
