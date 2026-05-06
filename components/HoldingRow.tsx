@@ -17,20 +17,34 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import type { EnrichedHolding, Holding } from '@/lib/types';
-import { formatTwd, formatPct, formatUnits } from '@/lib/format';
+import { formatTwd, formatPct, formatUnits, formatUsd } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type Props = {
   holding: EnrichedHolding;
-  /** 即時 USD/TWD 匯率,用於 crypto 成本 USD 輸入轉 TWD。null = 載入中或失敗。 */
+  /** 即時 USD/TWD 匯率;USD-native 類型編輯成本/月扣時用來轉 TWD canonical。 */
   usdTwd: number | null | undefined;
   onUpdate: (
-    next: Partial<Pick<Holding, 'units' | 'costBasisTwd' | 'monthlyAutoBuyTwd'>>,
+    next: Partial<
+      Pick<
+        Holding,
+        | 'units'
+        | 'costBasisTwd'
+        | 'costBasisUsd'
+        | 'monthlyAutoBuyTwd'
+        | 'monthlyAutoBuyUsd'
+      >
+    >,
   ) => void;
   onDelete: () => void;
   onBuyClick: () => void;
   onSellClick: () => void;
 };
+
+/** us_stock / crypto 用 USD 原貨幣編輯與顯示;其他類型用 TWD。 */
+function isUsdNativeType(type: Holding['type']): boolean {
+  return type === 'us_stock' || type === 'crypto';
+}
 
 export function HoldingRow({
   holding,
@@ -44,13 +58,34 @@ export function HoldingRow({
   const [editingCost, setEditingCost] = useState(false);
   const [editingMonthly, setEditingMonthly] = useState(false);
 
-  const isCrypto = holding.type === 'crypto';
+  const isUsdNative = isUsdNativeType(holding.type);
   const fxRate = usdTwd ?? 0;
+  const sourceHint = holding.type === 'crypto' ? '幣安' : '銀行';
 
+  // ── Cost view (USD-native types prefer Usd field; fallback to TWD/FX) ──
+  const costUsdView = isUsdNative
+    ? holding.costBasisUsd ??
+      (fxRate > 0 && holding.costBasisTwd > 0
+        ? holding.costBasisTwd / fxRate
+        : 0)
+    : 0;
+
+  // ── Monthly view ──
+  const monthlyTwd = holding.monthlyAutoBuyTwd ?? 0;
+  const monthlyUsdView = isUsdNative
+    ? holding.monthlyAutoBuyUsd ??
+      (fxRate > 0 && monthlyTwd > 0 ? monthlyTwd / fxRate : 0)
+    : 0;
+  const monthlyAmount = isUsdNative ? monthlyUsdView : monthlyTwd;
+  const hasMonthly = monthlyAmount > 0;
+
+  // ── Editor inputs (default = current display value) ──
   const [unitsInput, setUnitsInput] = useState(String(holding.units));
-  const [costInput, setCostInput] = useState(String(holding.costBasisTwd));
+  const [costInput, setCostInput] = useState(
+    isUsdNative ? (costUsdView > 0 ? costUsdView.toFixed(2) : '') : String(holding.costBasisTwd),
+  );
   const [monthlyInput, setMonthlyInput] = useState(
-    String(holding.monthlyAutoBuyTwd ?? ''),
+    hasMonthly ? String(monthlyAmount) : '',
   );
 
   const pnlPositive = holding.unrealizedPnlTwd >= 0;
@@ -68,45 +103,84 @@ export function HoldingRow({
   const commitCost = () => {
     const parsed = Number(costInput);
     if (!isFinite(parsed) || parsed < 0) {
-      // 還原
       setCostInput(
-        isCrypto && fxRate > 0
-          ? (holding.costBasisTwd / fxRate).toFixed(2)
+        isUsdNative
+          ? costUsdView > 0
+            ? costUsdView.toFixed(2)
+            : ''
           : String(holding.costBasisTwd),
       );
       setEditingCost(false);
       return;
     }
-    // crypto:input 是 USD,轉 TWD 才存
-    const newCostTwd =
-      isCrypto && fxRate > 0 ? Math.round(parsed * fxRate) : parsed;
-    if (Math.abs(newCostTwd - holding.costBasisTwd) > 0.5) {
-      onUpdate({ costBasisTwd: newCostTwd });
+    if (isUsdNative) {
+      if (fxRate <= 0) {
+        // 沒匯率時不能正確存,放棄這次編輯
+        setEditingCost(false);
+        return;
+      }
+      const newTwd = Math.round(parsed * fxRate);
+      const changed =
+        Math.abs(newTwd - holding.costBasisTwd) > 0.5 ||
+        (holding.costBasisUsd ?? -1) !== parsed;
+      if (changed) {
+        onUpdate({ costBasisTwd: newTwd, costBasisUsd: parsed });
+      }
+    } else {
+      if (Math.abs(parsed - holding.costBasisTwd) > 0.5) {
+        onUpdate({ costBasisTwd: parsed });
+      }
     }
     setEditingCost(false);
   };
 
   const commitMonthly = () => {
     const trimmed = monthlyInput.trim();
-    if (trimmed === '') {
-      if (holding.monthlyAutoBuyTwd != null) {
-        onUpdate({ monthlyAutoBuyTwd: undefined });
+    if (trimmed === '' || Number(trimmed) === 0) {
+      // 清除月扣
+      if (
+        holding.monthlyAutoBuyTwd != null ||
+        holding.monthlyAutoBuyUsd != null
+      ) {
+        onUpdate({
+          monthlyAutoBuyTwd: undefined,
+          monthlyAutoBuyUsd: undefined,
+        });
       }
       setEditingMonthly(false);
       return;
     }
     const parsed = Number(trimmed);
     if (!isFinite(parsed) || parsed < 0) {
-      setMonthlyInput(String(holding.monthlyAutoBuyTwd ?? ''));
-    } else if (parsed !== (holding.monthlyAutoBuyTwd ?? 0)) {
+      setMonthlyInput(hasMonthly ? String(monthlyAmount) : '');
+      setEditingMonthly(false);
+      return;
+    }
+    if (isUsdNative) {
+      if (fxRate <= 0) {
+        setEditingMonthly(false);
+        return;
+      }
       onUpdate({
-        monthlyAutoBuyTwd: parsed > 0 ? parsed : undefined,
+        monthlyAutoBuyUsd: parsed,
+        monthlyAutoBuyTwd: Math.round(parsed * fxRate),
       });
+    } else {
+      onUpdate({ monthlyAutoBuyTwd: parsed });
     }
     setEditingMonthly(false);
   };
 
-  const monthlyAmount = holding.monthlyAutoBuyTwd ?? 0;
+  // ── Display strings ──
+  const costDisplay = isUsdNative
+    ? `成本 ${formatUsd(costUsdView)}`
+    : `成本 ${formatTwd(holding.costBasisTwd)}`;
+
+  const monthlyDisplay = hasMonthly
+    ? isUsdNative
+      ? `月扣 ${formatUsd(monthlyAmount)}`
+      : `月扣 ${formatTwd(monthlyAmount)}`
+    : '+ 月扣';
 
   return (
     <div className="flex items-center justify-between gap-2 py-2 px-1 border-b border-border/50 last:border-b-0">
@@ -170,21 +244,21 @@ export function HoldingRow({
               className="hover:text-foreground transition-colors"
               onClick={() => {
                 setCostInput(
-                  isCrypto && fxRate > 0
-                    ? holding.costBasisTwd > 0
-                      ? (holding.costBasisTwd / fxRate).toFixed(2)
+                  isUsdNative
+                    ? costUsdView > 0
+                      ? costUsdView.toFixed(2)
                       : ''
                     : String(holding.costBasisTwd),
                 );
                 setEditingCost(true);
               }}
             >
-              成本 {formatTwd(holding.costBasisTwd)}
+              {costDisplay}
             </PopoverTrigger>
             <PopoverContent className="w-64" align="start">
               <Label htmlFor={`cost-${holding.id}`} className="text-xs">
-                {isCrypto
-                  ? '累計成本(USD,從幣安抄)'
+                {isUsdNative
+                  ? `累計成本(USD,從${sourceHint}抄)`
                   : '累計成本(TWD)'}
               </Label>
               <Input
@@ -202,7 +276,7 @@ export function HoldingRow({
                 autoFocus
                 className="mt-1"
               />
-              {isCrypto && (
+              {isUsdNative && (
                 <p className="text-xs text-muted-foreground mt-1.5">
                   {fxRate > 0 ? (
                     <>
@@ -228,27 +302,27 @@ export function HoldingRow({
             <PopoverTrigger
               className={cn(
                 'hover:text-foreground transition-colors',
-                monthlyAmount === 0 && 'text-muted-foreground/70',
+                !hasMonthly && 'text-muted-foreground/70',
               )}
               onClick={() => {
-                setMonthlyInput(String(holding.monthlyAutoBuyTwd ?? ''));
+                setMonthlyInput(hasMonthly ? String(monthlyAmount) : '');
                 setEditingMonthly(true);
               }}
             >
-              {monthlyAmount > 0
-                ? `月扣 ${formatTwd(monthlyAmount)}`
-                : '+ 月扣'}
+              {monthlyDisplay}
             </PopoverTrigger>
             <PopoverContent className="w-64" align="start">
               <Label htmlFor={`monthly-${holding.id}`} className="text-xs">
-                定期定額(每月 TWD)
+                {isUsdNative
+                  ? '每月定期定額(USD)'
+                  : '每月定期定額(TWD)'}
               </Label>
               <Input
                 id={`monthly-${holding.id}`}
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 step="any"
-                placeholder="例如 5000"
+                placeholder={isUsdNative ? '例如 50' : '例如 5000'}
                 value={monthlyInput}
                 onChange={(e) => setMonthlyInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -259,10 +333,21 @@ export function HoldingRow({
                 autoFocus
                 className="mt-1"
               />
+              {isUsdNative && (
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {fxRate > 0 ? (
+                    <>
+                      USD/TWD = {fxRate.toFixed(2)}
+                      {Number(monthlyInput) > 0 &&
+                        ` · ≈ ${formatTwd(Number(monthlyInput) * fxRate)}/月`}
+                    </>
+                  ) : (
+                    <span className="text-warning">即時匯率載入中</span>
+                  )}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground mt-2">
-                長期試算用這個值推累積。空白或 0 = 不定額。
-                <br />
-                Enter 確認 / Esc 取消
+                空白或 0 = 不定額。Enter 確認 / Esc 取消
               </p>
             </PopoverContent>
           </Popover>

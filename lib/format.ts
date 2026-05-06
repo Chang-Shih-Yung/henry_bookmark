@@ -35,9 +35,17 @@ export function formatChange(n: number): string {
 
 export function formatUnits(n: number, type: string): string {
   if (!isFinite(n)) return '—';
-  // crypto 顯示到 4 位小數,股票 / 現金 顯示整數或 2 位
+  // crypto 顯示到 8 位(幣安到 8),零股美股顯示到 5 位(銀行 app 5 位)
   if (type === 'crypto') {
-    return n.toLocaleString('zh-TW', { maximumFractionDigits: 4 });
+    return n.toLocaleString('zh-TW', { maximumFractionDigits: 8 });
+  }
+  if (type === 'us_stock') {
+    return n.toLocaleString('zh-TW', { maximumFractionDigits: 5 });
   }
   return n.toLocaleString('zh-TW', { maximumFractionDigits: 2 });
+}
+
+export function formatUsd(n: number): string {
+  if (!isFinite(n)) return '—';
+  return `$ ${n.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 }

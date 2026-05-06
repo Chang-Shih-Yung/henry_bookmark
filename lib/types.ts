@@ -25,7 +25,14 @@ export type Holding = {
   displayName: string; // 顯示名稱,例:台積電 / Google / 比特幣 / 活存
 
   units: number;
+  /** TWD canonical 成本,PnL 計算永遠用這個。USD-native 編輯時 = USD × 當下 FX。 */
   costBasisTwd: number;
+  /**
+   * USD 原始輸入(僅 us_stock / crypto / cash_usd)。
+   * 設了的話 UI 顯示 USD,沒設 fallback 顯示 TWD。
+   * 跟 costBasisTwd 同步寫入,避免重編時失去精度。
+   */
+  costBasisUsd?: number;
   realizedPnlTwd?: number; // 已實現損益(賣出時累積)
 
   /**
@@ -33,6 +40,8 @@ export type Holding = {
    * 例如富邦信託 4000(自存 2000 + 公司補 2000)、定期定額台積 5000。
    */
   monthlyAutoBuyTwd?: number;
+  /** USD 原始輸入(僅 us_stock / crypto / cash_usd)。跟 monthlyAutoBuyTwd 同步寫入。 */
+  monthlyAutoBuyUsd?: number;
 
   notes?: string;
   updatedAt: string; // ISO 8601

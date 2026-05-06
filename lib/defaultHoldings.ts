@@ -37,15 +37,17 @@ export function defaultHoldings(): Holdings {
       monthlyAutoBuyTwd: 6_000,
       updatedAt: now(),
     },
-    // ── 美股(USD 換 TWD,匯率 31.68)──
+    // ── 美股(USD primary,TWD = USD × 31.68 同步寫入用於 PnL/simulate)──
     {
       id: uid(),
       type: 'us_stock',
       symbol: 'GOOGL',
       displayName: 'Google',
       units: 0.20205,
-      costBasisTwd: 1_907, // ≈ $60.20 × 31.68
-      monthlyAutoBuyTwd: 1_584, // = $50 × 31.68
+      costBasisTwd: 1_907,
+      costBasisUsd: 60.2,
+      monthlyAutoBuyTwd: 1_584,
+      monthlyAutoBuyUsd: 50,
       updatedAt: now(),
     },
     {
@@ -54,11 +56,13 @@ export function defaultHoldings(): Holdings {
       symbol: 'VTI',
       displayName: 'VTI 全市場',
       units: 0.45724,
-      costBasisTwd: 4_758, // ≈ $150.20 × 31.68
-      monthlyAutoBuyTwd: 3_168, // = $100 × 31.68
+      costBasisTwd: 4_758,
+      costBasisUsd: 150.2,
+      monthlyAutoBuyTwd: 3_168,
+      monthlyAutoBuyUsd: 100,
       updatedAt: now(),
     },
-    // ── 加密貨幣(USD 換 TWD,匯率 31.68)──
+    // ── 加密貨幣(USD primary)──
     {
       id: uid(),
       type: 'crypto',
@@ -74,7 +78,8 @@ export function defaultHoldings(): Holdings {
       symbol: 'ETH',
       displayName: '以太幣',
       units: 0.19435692,
-      costBasisTwd: 21_273, // ≈ $671.49 × 31.68
+      costBasisTwd: 21_273,
+      costBasisUsd: 671.49,
       updatedAt: now(),
     },
     {
@@ -83,7 +88,8 @@ export function defaultHoldings(): Holdings {
       symbol: 'ADA',
       displayName: '艾達幣',
       units: 5408.57497361,
-      costBasisTwd: 98_624, // ≈ $3,113.14 × 31.68
+      costBasisTwd: 98_624,
+      costBasisUsd: 3_113.14,
       updatedAt: now(),
     },
     {
@@ -92,7 +98,8 @@ export function defaultHoldings(): Holdings {
       symbol: 'DOGE',
       displayName: '狗狗幣',
       units: 1808.49499497,
-      costBasisTwd: 15_354, // ≈ $484.68 × 31.68
+      costBasisTwd: 15_354,
+      costBasisUsd: 484.68,
       updatedAt: now(),
     },
     // ── 現金 / 信託(目前留空,user 自己填)──

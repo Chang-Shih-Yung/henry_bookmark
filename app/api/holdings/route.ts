@@ -11,8 +11,10 @@ const HoldingSchema = z.object({
   displayName: z.string(),
   units: z.number().nonnegative(),
   costBasisTwd: z.number().nonnegative(),
+  costBasisUsd: z.number().nonnegative().optional(),
   realizedPnlTwd: z.number().optional(),
   monthlyAutoBuyTwd: z.number().nonnegative().optional(),
+  monthlyAutoBuyUsd: z.number().nonnegative().optional(),
   notes: z.string().optional(),
   updatedAt: z.string(),
 });
