@@ -7,7 +7,10 @@ import {
   Settings as SettingsIcon,
   AlertCircle,
   BarChart3,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
+import { usePrivacy, maskMoney } from '@/lib/privacy';
 import { useHoldings, usePrices, useUpdateHoldings } from '@/lib/api';
 import { computeSummary, enrichHolding } from '@/lib/calc';
 import { defaultConfig } from '@/lib/config';
@@ -43,6 +46,7 @@ export function Dashboard() {
   const holdingsQ = useHoldings();
   const pricesQ = usePrices();
   const updateMut = useUpdateHoldings();
+  const { privacy, toggle: togglePrivacy } = usePrivacy();
 
   const [buyTarget, setBuyTarget] = useState<Holding | null>(null);
   const [sellTarget, setSellTarget] = useState<Holding | null>(null);
@@ -140,9 +144,24 @@ export function Dashboard() {
 
       {/* Hero: total + progress */}
       <section className="space-y-3">
-        <div className="text-xs text-muted-foreground">目前總資產</div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>目前總資產</span>
+          <button
+            type="button"
+            onClick={togglePrivacy}
+            className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-foreground transition-colors"
+            aria-label={privacy ? '顯示金額' : '隱藏金額'}
+          >
+            {privacy ? (
+              <EyeOff className="h-3.5 w-3.5" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
         <MoneyDisplay
           twd={summary.totalAssetTwd}
+          hidden={privacy}
           className="text-5xl font-bold font-display tracking-tight block text-foreground"
         />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm tabular-nums">
@@ -157,7 +176,7 @@ export function Dashboard() {
           >
             {summary.totalCostBasisTwd === 0
               ? '尚無成本資料'
-              : `累計 ${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${formatTwd(summary.totalUnrealizedPnlTwd)})`}
+              : `累計 ${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${maskMoney(formatTwd(summary.totalUnrealizedPnlTwd), privacy)})`}
           </span>
           {summary.totalTodayChangeTwd !== 0 && (
             <span
@@ -168,7 +187,7 @@ export function Dashboard() {
             >
               今日 {summary.totalTodayChangeTwd >= 0 ? '▲' : '▼'}{' '}
               {formatPct(summary.totalTodayChangePct)} (
-              {formatChange(summary.totalTodayChangeTwd)})
+              {maskMoney(formatChange(summary.totalTodayChangeTwd), privacy)})
             </span>
           )}
         </div>
@@ -177,8 +196,11 @@ export function Dashboard() {
           className="h-2"
         />
         <div className="text-xs text-muted-foreground tabular-nums">
-          {(summary.goalProgressPct * 100).toFixed(1)}% · 離 {formatTwd(defaultConfig.goalTwd)} 還差{' '}
-          <span className="text-foreground">{formatTwd(remainingToGoal)}</span>
+          {(summary.goalProgressPct * 100).toFixed(1)}% · 離{' '}
+          {maskMoney(formatTwd(defaultConfig.goalTwd), privacy)} 還差{' '}
+          <span className="text-foreground">
+            {maskMoney(formatTwd(remainingToGoal), privacy)}
+          </span>
         </div>
       </section>
 
@@ -213,13 +235,13 @@ export function Dashboard() {
           const pnlPct = cost > 0 ? (subtotal - cost) / cost : 0;
           const positive = subtotal - cost >= 0;
           return (
-            <div key={g.type} className="space-y-1">
+            <div key={g.type} className="space-y-2">
               <div className="flex items-center justify-between text-xs text-muted-foreground border-b border-border pb-1">
                 <span className="font-medium">
                   {g.icon} {g.label}
                 </span>
                 <span className="tabular-nums">
-                  {formatTwd(subtotal)}{' '}
+                  {maskMoney(formatTwd(subtotal), privacy)}{' '}
                   {cost > 0 && (
                     <span
                       className={cn(

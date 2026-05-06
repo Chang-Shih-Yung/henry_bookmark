@@ -9,6 +9,8 @@ type Props = {
   className?: string;
   defaultMode?: 'compact' | 'full';
   toggleable?: boolean;
+  /** 隱私模式 — 顯示遮蔽符號取代實際金額。 */
+  hidden?: boolean;
 };
 
 export function MoneyDisplay({
@@ -16,20 +18,24 @@ export function MoneyDisplay({
   className,
   defaultMode = 'compact',
   toggleable = true,
+  hidden = false,
 }: Props) {
   const [mode, setMode] = useState<'compact' | 'full'>(defaultMode);
+  const display = hidden ? '••••••' : formatTwd(twd, mode);
   return (
     <button
       type="button"
-      onClick={() => toggleable && setMode((m) => (m === 'compact' ? 'full' : 'compact'))}
+      onClick={() =>
+        !hidden && toggleable && setMode((m) => (m === 'compact' ? 'full' : 'compact'))
+      }
       className={cn(
         'tabular-nums transition-colors',
-        toggleable && 'cursor-pointer hover:text-foreground',
+        !hidden && toggleable && 'cursor-pointer hover:text-foreground',
         className,
       )}
-      aria-label={`金額 ${formatTwd(twd, 'full')}`}
+      aria-label={hidden ? '金額已隱藏' : `金額 ${formatTwd(twd, 'full')}`}
     >
-      {formatTwd(twd, mode)}
+      {display}
     </button>
   );
 }
