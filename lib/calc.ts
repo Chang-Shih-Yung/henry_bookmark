@@ -120,6 +120,7 @@ export function applyBuy(
   holding: Holding,
   addUnits: number,
   addCostTwd: number,
+  addCostUsd?: number,
 ): Holding {
   if (addUnits < 0 || addCostTwd < 0) {
     throw new Error('applyBuy: addUnits 與 addCostTwd 必須非負');
@@ -128,6 +129,9 @@ export function applyBuy(
     ...holding,
     units: holding.units + addUnits,
     costBasisTwd: holding.costBasisTwd + addCostTwd,
+    ...(addCostUsd != null
+      ? { costBasisUsd: (holding.costBasisUsd ?? 0) + addCostUsd }
+      : {}),
     updatedAt: new Date().toISOString(),
   };
 }

@@ -24,6 +24,7 @@ import {
   formatUnits,
   formatUsd,
   formatChange,
+  formatUpdatedAt,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
@@ -204,15 +205,20 @@ export function HoldingRow({
             </div>
           )}
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-8 px-2.5 gap-1.5 text-xs"
-          onClick={() => setEditing(true)}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          編輯
-        </Button>
+        <div className="flex flex-col items-end gap-0.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2.5 gap-1.5 text-xs"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            編輯
+          </Button>
+          <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+            上次更新 {formatUpdatedAt(holding.updatedAt)}
+          </span>
+        </div>
       </div>
 
       <HoldingEditSheet
