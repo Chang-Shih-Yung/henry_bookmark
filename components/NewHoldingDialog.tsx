@@ -45,7 +45,7 @@ const TYPE_DEFAULTS: Record<
   trust: {
     symbolPlaceholder: 'fubon-trust',
     namePlaceholder: '富邦信託',
-    symbolHint: '無公開即時價,以累計成本估算市值',
+    symbolHint: '無公開即時價,以累計已投入金額估算市值',
   },
 };
 
@@ -139,7 +139,7 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
               />
             </div>
             <div>
-              <Label htmlFor="new-cost">成本(TWD)</Label>
+              <Label htmlFor="new-cost">已投入(TWD)</Label>
               <Input
                 id="new-cost"
                 type="number"

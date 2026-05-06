@@ -190,7 +190,7 @@ export function HoldingRow({
             <span className="text-foreground font-medium tabular-nums">
               {formatUnits(holding.units, holding.type)}
             </span>{' '}
-            {unitLabelShort(holding.type)} · 成本{' '}
+            {unitLabelShort(holding.type)} · 已投入{' '}
             <span className="text-foreground tabular-nums">
               {maskMoney(costStr, privacy)}
             </span>

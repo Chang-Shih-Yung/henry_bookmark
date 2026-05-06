@@ -181,7 +181,7 @@ export function HoldingEditSheet({
           {/* Cost */}
           <div className="space-y-1.5">
             <Label htmlFor="edit-cost" className="text-sm">
-              累計成本{isUsdNative ? usdLabel : '(TWD)'}
+              已投入金額{isUsdNative ? usdLabel : '(TWD)'}
             </Label>
             <Input
               id="edit-cost"

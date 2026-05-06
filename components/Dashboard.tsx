@@ -175,7 +175,7 @@ export function Dashboard() {
             )}
           >
             {summary.totalCostBasisTwd === 0
-              ? '尚無成本資料'
+              ? '尚未投入'
               : `累計 ${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${maskMoney(formatTwd(summary.totalUnrealizedPnlTwd), privacy)})`}
           </span>
           {summary.totalTodayChangeTwd !== 0 && (

@@ -56,7 +56,7 @@ export function BuyDialog({ holding, open, onClose, onConfirm }: BuyProps) {
         <DialogHeader>
           <DialogTitle>加買 / 加值 — {holding.displayName}</DialogTitle>
           <DialogDescription>
-            目前持有 {formatUnits(holding.units, holding.type)} · 成本 {formatTwd(holding.costBasisTwd)}
+            目前持有 {formatUnits(holding.units, holding.type)} · 已投入 {formatTwd(holding.costBasisTwd)}
           </DialogDescription>
         </DialogHeader>
 
