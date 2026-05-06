@@ -211,7 +211,11 @@ export function HoldingRow({
               {formatUnits(holding.units, holding.type)}{' '}
               {unitLabel(holding.type)}
             </PopoverTrigger>
-            <PopoverContent className="w-64" align="start">
+            <PopoverContent
+              className="w-64"
+              align="start"
+              initialFocus={false}
+            >
               <Label htmlFor={`units-${holding.id}`} className="text-xs">
                 數量({unitLabel(holding.type)})
               </Label>
@@ -227,7 +231,7 @@ export function HoldingRow({
                   if (e.key === 'Escape') setEditingUnits(false);
                 }}
                 onBlur={commitUnits}
-                autoFocus
+                ref={(el) => el?.focus({ preventScroll: true })}
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-2">
@@ -255,7 +259,11 @@ export function HoldingRow({
             >
               {costDisplay}
             </PopoverTrigger>
-            <PopoverContent className="w-64" align="start">
+            <PopoverContent
+              className="w-64"
+              align="start"
+              initialFocus={false}
+            >
               <Label htmlFor={`cost-${holding.id}`} className="text-xs">
                 {isUsdNative
                   ? `累計成本(USD,從${sourceHint}抄)`
@@ -273,7 +281,7 @@ export function HoldingRow({
                   if (e.key === 'Escape') setEditingCost(false);
                 }}
                 onBlur={commitCost}
-                autoFocus
+                ref={(el) => el?.focus({ preventScroll: true })}
                 className="mt-1"
               />
               {isUsdNative && (
@@ -311,7 +319,11 @@ export function HoldingRow({
             >
               {monthlyDisplay}
             </PopoverTrigger>
-            <PopoverContent className="w-64" align="start">
+            <PopoverContent
+              className="w-64"
+              align="start"
+              initialFocus={false}
+            >
               <Label htmlFor={`monthly-${holding.id}`} className="text-xs">
                 {isUsdNative
                   ? '每月定期定額(USD)'
@@ -330,7 +342,7 @@ export function HoldingRow({
                   if (e.key === 'Escape') setEditingMonthly(false);
                 }}
                 onBlur={commitMonthly}
-                autoFocus
+                ref={(el) => el?.focus({ preventScroll: true })}
                 className="mt-1"
               />
               {isUsdNative && (
