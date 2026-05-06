@@ -359,7 +359,7 @@ export function Dashboard() {
           </section>
         </>
       ) : (
-        <section className="space-y-2">
+        <section className="space-y-1">
           {enriched.filter((h) => tabMatches(tab, h.type)).length === 0 ? (
             <div className="text-center py-12 text-sm text-muted-foreground">
               這個分類還沒有資產。
@@ -367,16 +367,18 @@ export function Dashboard() {
               用下面的按鈕新增第一筆。
             </div>
           ) : (
-            enriched
-              .filter((h) => tabMatches(tab, h.type))
-              .map((h) => (
-                <HoldingRow
-                  key={h.id}
-                  holding={h}
-                  usdTwd={pricesQ.data?.usdTwd}
-                  onCardClick={() => setDetailTarget(h)}
-                />
-              ))
+            <div className="rounded-xl border border-border bg-card/30 overflow-hidden divide-y divide-border/40">
+              {enriched
+                .filter((h) => tabMatches(tab, h.type))
+                .map((h) => (
+                  <HoldingRow
+                    key={h.id}
+                    holding={h}
+                    usdTwd={pricesQ.data?.usdTwd}
+                    onCardClick={() => setDetailTarget(h)}
+                  />
+                ))}
+            </div>
           )}
           <NewButtons tab={tab} onNew={(type) => setNewType(type)} />
         </section>
