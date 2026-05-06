@@ -1,12 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import {
   Plus,
-  Settings as SettingsIcon,
   AlertCircle,
-  BarChart3,
   Eye,
   EyeOff,
   ChevronRight,
@@ -173,24 +170,15 @@ export function Dashboard() {
     : [];
 
   return (
-    <main className="mx-auto w-full max-w-2xl p-4 pb-24 space-y-6">
-      {/* Header */}
-      <header className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight font-display">
+    <main
+      className="mx-auto w-full max-w-2xl p-4 pb-32 space-y-6"
+      style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
+    >
+      {/* Header — 主導航在底部,header 只留品牌名 */}
+      <header className="pt-2">
+        <h1 className="text-base font-semibold tracking-tight font-display text-muted-foreground">
           Henry Bookmark
         </h1>
-        <div className="flex items-center gap-1">
-          <Link href="/simulate">
-            <Button variant="ghost" size="icon" aria-label="長期試算">
-              <BarChart3 className="h-5 w-5" />
-            </Button>
-          </Link>
-          <Link href="/settings">
-            <Button variant="ghost" size="icon" aria-label="設定">
-              <SettingsIcon className="h-5 w-5" />
-            </Button>
-          </Link>
-        </div>
       </header>
 
       {/* Hero: total + progress */}

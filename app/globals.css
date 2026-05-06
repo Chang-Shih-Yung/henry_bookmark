@@ -99,7 +99,9 @@
   --up: oklch(0.7 0.2 25);
   --down: oklch(0.7 0.15 165);
   --warning: oklch(0.8 0.15 80);
-  --accent-brand: oklch(0.65 0.2 25);
+  /* 品牌色:蒂芬尼藍/teal,跟 up(紅漲)/ down(綠跌)拉開色相,
+     既不會跟 PnL 撞,又給整體一點金融科技的冷光感。 */
+  --accent-brand: oklch(0.78 0.13 210);
 
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

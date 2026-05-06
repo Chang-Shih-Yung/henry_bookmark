@@ -22,7 +22,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#fafafa',
+  themeColor: '#0a0a0a',
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -33,9 +34,9 @@ export default function RootLayout({
   return (
     <html
       lang="zh-TW"
-      className={`${interTight.variable} ${inter.variable} h-full antialiased`}
+      className={`dark ${interTight.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-body tabular-nums">
+      <body className="min-h-full flex flex-col font-body tabular-nums bg-background text-foreground">
         <Providers>{children}</Providers>
         <Toaster richColors position="top-center" />
       </body>
