@@ -1,33 +1,43 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import {
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip,
+  type ChartOptions,
+  type TooltipItem,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
 import type { EnrichedHolding } from '@/lib/types';
 import { formatTwd } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Filler,
+);
+
 type Props = {
-  /** 全部 enriched holdings — 從 transactions 反推累計投入時間線。 */
   enriched: EnrichedHolding[];
-  /** 馬賽克模式時隱藏 y 軸刻度 + tooltip 數字。 */
   privacy: boolean;
-  /** 圖表高度,預設 120px(sparkline 風格)。 */
   height?: number;
 };
 
 /**
- * 累計資產投入曲線 — 自寫 SVG sparkline,對齊參考圖風格:
- * 純線條 + 漸層 fill 曲線下緣 + dotted gridline 標當前點 + 高亮的當前點 dot
- *
- * 從 transactions 累加 costDeltaTwd 取得時間線,按月聚合避免線條鋸齒。
- * 不可能還原歷史市值(只有現在的價),畫的是「累計成本投入」(已投入金錢的曲線)。
+ * 累計資產投入曲線 — Chart.js 深度客製,風格對齊參考截圖:
+ * 漸層 stroke + 漸層 fill + 隱藏 grid/y-ticks + 終點 dot + tooltip pill
  */
-export function AssetGrowthChart({
-  enriched,
-  privacy,
-  height = 120,
-}: Props) {
+export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
   const series = useMemo(() => buildSeries(enriched), [enriched]);
-  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   if (series.points.length < 2) {
     return (
@@ -39,64 +49,149 @@ export function AssetGrowthChart({
     );
   }
 
-  const W = 320; // viewBox 寬,實際 SVG 用 100% width 拉伸
-  const H = height;
-  const PAD_X = 16;
-  const PAD_TOP = 16;
-  const PAD_BOTTOM = 24; // 給 month label
-
+  const labels = series.points.map((p) => p.label);
   const values = series.points.map((p) => p.cumulativeCost);
-  const minV = Math.min(...values);
-  const maxV = Math.max(...values);
-  const range = maxV - minV || 1;
-
-  // 把 (idx, value) 映射到 SVG 座標
-  const innerW = W - PAD_X * 2;
-  const innerH = H - PAD_TOP - PAD_BOTTOM;
-  const xAt = (i: number) =>
-    PAD_X + (i / Math.max(series.points.length - 1, 1)) * innerW;
-  const yAt = (v: number) =>
-    PAD_TOP + (1 - (v - minV) / range) * innerH;
-
-  // 平滑曲線(用 catmull-rom → bezier,sparkline 不需太複雜,簡單線性也 OK)
-  const linePath = series.points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(p.cumulativeCost)}`)
-    .join(' ');
-  const fillPath = `${linePath} L ${xAt(series.points.length - 1)} ${PAD_TOP + innerH} L ${PAD_X} ${PAD_TOP + innerH} Z`;
-
-  // 預設高亮終點(最新),hover 時移動
-  const focusIdx = hoverIdx ?? series.points.length - 1;
-  const focusPoint = series.points[focusIdx];
-  const focusX = xAt(focusIdx);
-  const focusY = yAt(focusPoint.cumulativeCost);
-
-  // 顯示 hover 點上方的小標籤
-  const labelOffset = 18;
-  const labelX = Math.min(Math.max(focusX, PAD_X + 30), W - PAD_X - 30);
-  const labelY = Math.max(focusY - labelOffset, PAD_TOP + 4);
-
-  // 取代表性 month labels(首、中、尾)
-  const monthLabels = series.points.length <= 6
-    ? series.points.map((_, i) => i)
-    : [0, Math.floor(series.points.length / 2), series.points.length - 1];
-
+  const lastIdx = values.length - 1;
   const positive = series.currentMarketValue >= series.totalCost;
+
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: '累計投入',
+        data: values,
+        borderWidth: 2,
+        // 平滑曲線
+        tension: 0.4,
+        // 漸層 stroke(teal → cyan)
+        borderColor: (ctx: { chart: ChartJS }) => {
+          const { chart } = ctx;
+          if (!chart.chartArea) return 'oklch(0.78 0.18 210)';
+          const gradient = chart.ctx.createLinearGradient(
+            chart.chartArea.left,
+            0,
+            chart.chartArea.right,
+            0,
+          );
+          gradient.addColorStop(0, 'oklch(0.7 0.18 195)');
+          gradient.addColorStop(1, 'oklch(0.78 0.2 210)');
+          return gradient;
+        },
+        // 漸層 fill(teal 35% → transparent)
+        backgroundColor: (ctx: { chart: ChartJS }) => {
+          const { chart } = ctx;
+          if (!chart.chartArea) return 'oklch(0.78 0.18 210 / 0.2)';
+          const gradient = chart.ctx.createLinearGradient(
+            0,
+            chart.chartArea.top,
+            0,
+            chart.chartArea.bottom,
+          );
+          gradient.addColorStop(0, 'oklch(0.78 0.18 210 / 0.4)');
+          gradient.addColorStop(1, 'oklch(0.78 0.18 210 / 0)');
+          return gradient;
+        },
+        fill: true,
+        // 預設不顯示 point,只在最後一點 + hover 才顯示
+        pointRadius: (ctx: { dataIndex: number }) =>
+          ctx.dataIndex === lastIdx ? 5 : 0,
+        pointHoverRadius: 6,
+        pointBackgroundColor: 'oklch(0.205 0 0)',
+        pointBorderColor: 'oklch(0.78 0.18 210)',
+        pointBorderWidth: 2,
+        pointHitRadius: 24,
+      },
+    ],
+  };
+
+  const options: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: 'index',
+      intersect: false,
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: 'oklch(0.205 0 0 / 0.95)',
+        titleColor: 'oklch(0.78 0.18 210)',
+        bodyColor: 'oklch(0.985 0 0)',
+        borderColor: 'oklch(0.78 0.18 210 / 0.4)',
+        borderWidth: 1,
+        padding: 8,
+        boxPadding: 0,
+        cornerRadius: 6,
+        displayColors: false,
+        titleFont: {
+          size: 10,
+          weight: 'normal',
+        },
+        bodyFont: {
+          size: 12,
+          weight: 600,
+          family: 'var(--font-display)',
+        },
+        callbacks: {
+          title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
+          label: (ctx: TooltipItem<'line'>) => {
+            const v = ctx.parsed.y;
+            return privacy || v === null ? '••••••' : formatTwd(v);
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: {
+          color: 'oklch(0.708 0 0)',
+          font: {
+            size: 10,
+            family: 'var(--font-display)',
+          },
+          maxRotation: 0,
+          autoSkip: true,
+          autoSkipPadding: 24,
+        },
+      },
+      y: {
+        // 完全隱藏 y 軸 — 純 sparkline 視覺
+        display: false,
+        grid: { display: false },
+        beginAtZero: false,
+        // 留一點 padding 不讓線貼底
+        suggestedMin: Math.min(...values) - (Math.max(...values) - Math.min(...values)) * 0.15,
+        suggestedMax: Math.max(...values) + (Math.max(...values) - Math.min(...values)) * 0.1,
+      },
+    },
+    elements: {
+      line: {
+        // CSS filter 透過 Chart.js 不直接支援,改用 shadowBlur(在 plugin 加)
+      },
+    },
+  };
 
   return (
     <div className="rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-4">
       {/* 上方數字概覽 */}
-      <div className="flex items-end justify-between mb-1">
+      <div className="flex items-end justify-between mb-3">
         <div>
-          <div className="text-xs text-muted-foreground">累計投入</div>
-          <div className="text-2xl font-display font-semibold tabular-nums tracking-tight">
+          <div className="text-[11px] text-muted-foreground tracking-wide uppercase">
+            累計投入
+          </div>
+          <div className="text-2xl font-display font-semibold tabular-nums tracking-tight mt-0.5">
             {privacy ? '••••••' : formatTwd(series.totalCost)}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-muted-foreground">目前市值</div>
+          <div className="text-[11px] text-muted-foreground tracking-wide uppercase">
+            目前市值
+          </div>
           <div
             className={cn(
-              'text-2xl font-display font-semibold tabular-nums tracking-tight',
+              'text-2xl font-display font-semibold tabular-nums tracking-tight mt-0.5',
               positive ? 'text-up' : 'text-down',
             )}
           >
@@ -105,136 +200,17 @@ export function AssetGrowthChart({
         </div>
       </div>
 
-      {/* SVG sparkline */}
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full mt-2"
-        style={{ height }}
-        onMouseLeave={() => setHoverIdx(null)}
-        onTouchEnd={() => setHoverIdx(null)}
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const xRel = ((e.clientX - rect.left) / rect.width) * W;
-          handlePointer(xRel);
-        }}
-        onTouchMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          const xRel =
-            ((e.touches[0].clientX - rect.left) / rect.width) * W;
-          handlePointer(xRel);
+      {/* Chart.js 容器:加 drop-shadow 讓線條發 teal 光 */}
+      <div
+        style={{
+          height,
+          filter: 'drop-shadow(0 0 6px oklch(0.78 0.18 210 / 0.4))',
         }}
       >
-        <defs>
-          <linearGradient id="agc-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="oklch(0.78 0.18 210)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="oklch(0.78 0.18 210)" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="agc-stroke" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="oklch(0.7 0.18 195)" />
-            <stop offset="100%" stopColor="oklch(0.78 0.2 210)" />
-          </linearGradient>
-        </defs>
-
-        {/* 漸層 fill 區域 */}
-        <path d={fillPath} fill="url(#agc-fill)" />
-
-        {/* 主曲線 */}
-        <path
-          d={linePath}
-          fill="none"
-          stroke="url(#agc-stroke)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ filter: 'drop-shadow(0 0 6px oklch(0.78 0.18 210 / 0.4))' }}
-        />
-
-        {/* hover dotted vertical line */}
-        <line
-          x1={focusX}
-          y1={PAD_TOP}
-          x2={focusX}
-          y2={PAD_TOP + innerH}
-          stroke="oklch(1 0 0 / 0.15)"
-          strokeWidth="1"
-          strokeDasharray="3 3"
-        />
-
-        {/* hover dot:中心點 + 外圈 halo */}
-        <circle
-          cx={focusX}
-          cy={focusY}
-          r="8"
-          fill="oklch(0.78 0.18 210)"
-          fillOpacity="0.15"
-        />
-        <circle
-          cx={focusX}
-          cy={focusY}
-          r="4"
-          fill="oklch(0.205 0 0)"
-          stroke="oklch(0.78 0.18 210)"
-          strokeWidth="2"
-        />
-
-        {/* 上方小標籤(顯示 hover 點的金額) */}
-        <g transform={`translate(${labelX}, ${labelY})`}>
-          <rect
-            x="-30"
-            y="-12"
-            width="60"
-            height="14"
-            rx="3"
-            fill="oklch(0.205 0 0 / 0.85)"
-            stroke="oklch(1 0 0 / 0.1)"
-          />
-          <text
-            x="0"
-            y="-2"
-            textAnchor="middle"
-            fontSize="9"
-            fontFamily="var(--font-display)"
-            fill="oklch(0.985 0 0)"
-            className="tabular-nums"
-          >
-            {privacy
-              ? '•••••'
-              : formatTwd(focusPoint.cumulativeCost).replace('NT$ ', '')}
-          </text>
-        </g>
-
-        {/* 月份 labels */}
-        {monthLabels.map((i) => (
-          <text
-            key={i}
-            x={xAt(i)}
-            y={H - 6}
-            textAnchor="middle"
-            fontSize="9"
-            fill="oklch(0.708 0 0)"
-            className="tabular-nums"
-            fontFamily="var(--font-display)"
-          >
-            {series.points[i].label}
-          </text>
-        ))}
-      </svg>
+        <Line data={data} options={options} />
+      </div>
     </div>
   );
-
-  function handlePointer(svgX: number) {
-    // svgX 是 viewBox 座標(0 ~ W)
-    let bestIdx = 0;
-    let bestDist = Infinity;
-    for (let i = 0; i < series.points.length; i++) {
-      const dist = Math.abs(xAt(i) - svgX);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIdx = i;
-      }
-    }
-    setHoverIdx(bestIdx);
-  }
 }
 
 type SeriesPoint = { label: string; cumulativeCost: number };

@@ -1,17 +1,8 @@
 'use client';
 
-import {
-  AlertTriangle,
-  Building2,
-  Globe,
-  Bitcoin,
-  Wallet,
-  Landmark,
-  ChevronRight,
-  type LucideIcon,
-} from 'lucide-react';
+import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { AssetType, EnrichedHolding } from '@/lib/types';
+import type { EnrichedHolding } from '@/lib/types';
 import {
   formatTwd,
   formatPct,
@@ -31,28 +22,11 @@ type Props = {
   onCardClick: () => void;
 };
 
-function typeIcon(type: AssetType): LucideIcon {
-  switch (type) {
-    case 'tw_stock':
-      return Building2;
-    case 'us_stock':
-      return Globe;
-    case 'crypto':
-      return Bitcoin;
-    case 'cash_twd':
-    case 'cash_usd':
-      return Wallet;
-    case 'trust':
-      return Landmark;
-  }
-}
-
 export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
   const { privacy } = usePrivacy();
 
   const isUsdNative = isUsdNativeType(holding.type);
   const fxRate = usdTwd ?? 0;
-  const Icon = typeIcon(holding.type);
 
   const pnlPositive = holding.unrealizedPnlTwd >= 0;
   const hasTodayChange = holding.todayChangePct !== null;
@@ -91,11 +65,6 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
         'hover:bg-card/70 active:bg-card/80',
       )}
     >
-      {/* Type icon */}
-      <div className="h-10 w-10 shrink-0 rounded-full bg-background/40 backdrop-blur-sm border border-white/10 inline-flex items-center justify-center text-foreground/80 shadow-inner">
-        <Icon className="h-4 w-4" />
-      </div>
-
       {/* Name + symbol/price */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
