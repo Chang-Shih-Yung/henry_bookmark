@@ -12,22 +12,16 @@ import type { Holding, Prices } from './types';
 const ts = '2026-05-05T00:00:00Z';
 
 const samplePrices: Prices = {
-  tsmc: 800, // TWD per share
-  tsmcPrev: 790,
-  etf0050: 200,
-  etf0050Prev: 198,
-  googl: 5000, // TWD per share (already converted)
-  googlPrev: 4950,
-  vti: 1600,
-  vtiPrev: 1590,
-  btc: 1_700_000, // TWD per BTC
-  btcPrev: 1_680_000,
-  eth: 100_000,
-  ethPrev: 98_000,
-  ada: 18,
-  adaPrev: 17.5,
-  doge: 9, // TWD per DOGE
-  dogePrev: 8.7,
+  symbols: {
+    '2330.TW': { currentTwd: 800, prevTwd: 790 },
+    '0050.TW': { currentTwd: 200, prevTwd: 198 },
+    GOOGL: { currentTwd: 5000, prevTwd: 4950 }, // 已是 server side 換算的 TWD per share
+    VTI: { currentTwd: 1600, prevTwd: 1590 },
+    BTC: { currentTwd: 1_700_000, prevTwd: 1_680_000 }, // TWD per BTC
+    ETH: { currentTwd: 100_000, prevTwd: 98_000 },
+    ADA: { currentTwd: 18, prevTwd: 17.5 },
+    DOGE: { currentTwd: 9, prevTwd: 8.7 },
+  },
   usdTwd: 32,
   fetchedAt: ts,
 };
@@ -120,7 +114,13 @@ describe('enrichHolding', () => {
       units: 30,
       costBasisTwd: 22_000,
     });
-    const failedPrices: Prices = { ...samplePrices, tsmc: null };
+    // 模擬 API 沒回該 symbol(removed from Record)
+    const { '2330.TW': _omit, ...remaining } = samplePrices.symbols;
+    void _omit;
+    const failedPrices: Prices = {
+      ...samplePrices,
+      symbols: remaining,
+    };
     const e = enrichHolding(h, failedPrices);
     expect(e.currentPriceTwd).toBeNull();
     expect(e.marketValueTwd).toBe(22_000);

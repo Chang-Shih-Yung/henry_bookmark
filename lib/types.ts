@@ -111,30 +111,27 @@ export type Config = {
 };
 
 /**
- * /api/prices 內部用的純價格資料(TWD per unit)。
+ * 單一 symbol 的 TWD 計價快照(current + prev 各一)。
  * us stocks 已在 server side 用即時 USD/TWD 換算成 TWD per share。
- *
- * `*Prev` = 昨日收盤(stocks)/ 24 小時前(crypto),都是 TWD per unit。
- * 為了讓「今日漲跌」純反映該檔的價格變化(不被 FX 變動污染),美股的
- * prev 在 server 用「同一支當下的 usdTwd」換算,而非昨日 FX。
+ * prev = 昨日收盤(stocks)/ 24 小時前(crypto)。為了讓「今日漲跌」
+ * 純反映該檔的價格變化(不被 FX 變動污染),美股的 prev 在 server
+ * 用「同一支當下的 usdTwd」換算,而非昨日 FX。
+ */
+export type SymbolPrice = {
+  currentTwd: number | null;
+  prevTwd: number | null;
+};
+
+/**
+ * /api/prices 內部用的價格資料。
+ * symbols Record 以 holding.symbol 為 key,任何 user 加的新部位
+ * 只要 client 在 query 帶上,server 就會 fetch 並回傳對應 entry。
+ * 之前是寫死 8 個 fields(tsmc/etf0050/googl/vti/btc/eth/ada/doge),
+ * 現在改 Record 後加新標的不用動 type / route / calc 三處。
  */
 export type Prices = {
-  tsmc: number | null;
-  tsmcPrev: number | null;
-  etf0050: number | null;
-  etf0050Prev: number | null;
-  googl: number | null;
-  googlPrev: number | null;
-  vti: number | null;
-  vtiPrev: number | null;
-  btc: number | null;
-  btcPrev: number | null;
-  eth: number | null;
-  ethPrev: number | null;
-  ada: number | null;
-  adaPrev: number | null;
-  doge: number | null;
-  dogePrev: number | null;
+  symbols: Record<string, SymbolPrice>;
+  /** 即時 TWD per USD,給 cash_usd / 美股換算 / 試算用 */
   usdTwd: number | null;
   fetchedAt: string;
 };

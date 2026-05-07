@@ -63,24 +63,17 @@ export function enrichHolding(
   };
 }
 
+/**
+ * 從 prices.symbols Record 查當前 TWD 價格。
+ * 之前是寫死 switch 對 8 個 symbol 配 8 個 fields,加新 holding 要改三處,
+ * 現在改 Record lookup 後加新部位 server / type / calc 都不用動。
+ */
 function lookupPriceTwd(holding: Holding, prices: Prices): number | null {
   switch (holding.type) {
     case 'tw_stock':
-      if (holding.symbol === '2330.TW') return prices.tsmc;
-      if (holding.symbol === '0050.TW') return prices.etf0050;
-      return null;
-    case 'us_stock': {
-      // us stocks 的 prices 已是 server side 換算成 TWD per share
-      if (holding.symbol === 'GOOGL') return prices.googl;
-      if (holding.symbol === 'VTI') return prices.vti;
-      return null;
-    }
+    case 'us_stock':
     case 'crypto':
-      if (holding.symbol === 'BTC') return prices.btc;
-      if (holding.symbol === 'ETH') return prices.eth;
-      if (holding.symbol === 'ADA') return prices.ada;
-      if (holding.symbol === 'DOGE') return prices.doge;
-      return null;
+      return prices.symbols[holding.symbol]?.currentTwd ?? null;
     case 'cash_twd':
       return 1;
     case 'cash_usd':
@@ -92,27 +85,16 @@ function lookupPriceTwd(holding: Holding, prices: Prices): number | null {
   }
 }
 
-/** 對應 lookupPriceTwd 的 prev 版本。沒 prev 資料就回 null,enrichHolding 會把今日漲跌設 0。 */
+/** 對應 lookupPriceTwd 的 prev 版本。現金 / 信託沒「漲跌」概念,直接 null。 */
 function lookupPrevPriceTwd(holding: Holding, prices: Prices): number | null {
   switch (holding.type) {
     case 'tw_stock':
-      if (holding.symbol === '2330.TW') return prices.tsmcPrev;
-      if (holding.symbol === '0050.TW') return prices.etf0050Prev;
-      return null;
     case 'us_stock':
-      if (holding.symbol === 'GOOGL') return prices.googlPrev;
-      if (holding.symbol === 'VTI') return prices.vtiPrev;
-      return null;
     case 'crypto':
-      if (holding.symbol === 'BTC') return prices.btcPrev;
-      if (holding.symbol === 'ETH') return prices.ethPrev;
-      if (holding.symbol === 'ADA') return prices.adaPrev;
-      if (holding.symbol === 'DOGE') return prices.dogePrev;
-      return null;
+      return prices.symbols[holding.symbol]?.prevTwd ?? null;
     case 'cash_twd':
     case 'cash_usd':
     case 'trust':
-      // 現金 / 信託沒有「漲跌」概念
       return null;
   }
 }
