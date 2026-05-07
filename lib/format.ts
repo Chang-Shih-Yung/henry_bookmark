@@ -10,23 +10,10 @@ const twdFmt = new Intl.NumberFormat('zh-TW', {
 
 const numFmt = new Intl.NumberFormat('zh-TW');
 
-export function formatTwd(n: number, mode: 'compact' | 'full' = 'compact'): string {
+export function formatTwd(n: number, _mode: 'compact' | 'full' = 'compact'): string {
   if (!isFinite(n)) return '—';
-  if (mode === 'full') return twdFmt.format(Math.round(n));
-
-  const abs = Math.abs(n);
-  const sign = n < 0 ? '-' : '';
-  if (abs >= 1e8) {
-    const v = (abs / 1e8).toFixed(2).replace(/\.?0+$/, '');
-    return `${sign}NT$ ${v} 億`;
-  }
-  if (abs >= 1e4) {
-    // 1 位小數,但 .0 結尾就修掉(2.0 萬 → 2 萬)
-    const v = (abs / 1e4).toFixed(1);
-    const trimmed = v.endsWith('.0') ? v.slice(0, -2) : v;
-    return `${sign}NT$ ${trimmed} 萬`;
-  }
-  return `${sign}NT$ ${numFmt.format(Math.round(abs))}`;
+  // 一律顯示完整數字 — 仿國泰證券 app(NT$ 94,444 而不是 9.4 萬)
+  return twdFmt.format(Math.round(n));
 }
 
 export function formatPct(n: number, digits = 1): string {
