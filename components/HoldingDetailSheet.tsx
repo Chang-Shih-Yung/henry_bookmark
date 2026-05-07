@@ -64,15 +64,21 @@ export function HoldingDetailSheet({
     ? `$ ${costUsdView.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
     : formatTwd(holding.costBasisTwd);
 
+  // 成交均價:優先用使用者從國泰/券商 app 抄來的(不含手續費),
+  // 沒抄就 fallback 算 cost ÷ units(會多含手續費,跟 app 差 ~0.5–1 元 / 股)
+  const manualAvg = isUsdNative ? holding.avgPriceUsd : holding.avgPriceTwd;
   const showAvg =
     stockOrCrypto &&
-    holding.units > 0 &&
-    (isUsdNative ? costUsdView > 0 : holding.costBasisTwd > 0);
-  const avg = showAvg
-    ? isUsdNative
-      ? costUsdView / holding.units
-      : holding.costBasisTwd / holding.units
-    : 0;
+    (manualAvg !== undefined ||
+      (holding.units > 0 &&
+        (isUsdNative ? costUsdView > 0 : holding.costBasisTwd > 0)));
+  const avg = !showAvg
+    ? 0
+    : manualAvg !== undefined
+      ? manualAvg
+      : isUsdNative
+        ? costUsdView / holding.units
+        : holding.costBasisTwd / holding.units;
   const avgStr = formatPrice(avg, isUsdNative ? 'USD' : 'TWD');
 
   const priceStr = formatPriceForDisplay(

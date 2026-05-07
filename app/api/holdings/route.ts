@@ -29,6 +29,8 @@ const HoldingSchema = z.object({
   monthlyAutoBuyUsd: z.number().nonnegative().optional(),
   notes: z.string().optional(),
   updatedAt: z.string(),
+  avgPriceTwd: z.number().positive().optional(),
+  avgPriceUsd: z.number().positive().optional(),
   transactions: z.array(TransactionSchema).optional(),
 });
 

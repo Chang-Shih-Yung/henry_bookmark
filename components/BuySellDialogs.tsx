@@ -45,11 +45,13 @@ export function BuyDialog({
 }: BuyProps) {
   const [units, setUnits] = useState('');
   const [cost, setCost] = useState('');
+  const [avg, setAvg] = useState('');
 
   useEffect(() => {
     if (open && holding) {
       setUnits('');
       setCost('');
+      setAvg('');
     }
   }, [open, holding]);
 
@@ -104,11 +106,21 @@ export function BuyDialog({
   const handle = () => {
     if (!canSubmit) return;
     try {
-      if (isUsdNative) {
-        onConfirm(applyBuy(holding, addUnits, addCostTwd, addCostUsd, 'buy'));
-      } else {
-        onConfirm(applyBuy(holding, addUnits, addCostTwd, undefined, 'buy'));
-      }
+      const next = isUsdNative
+        ? applyBuy(holding, addUnits, addCostTwd, addCostUsd, 'buy')
+        : applyBuy(holding, addUnits, addCostTwd, undefined, 'buy');
+      // 如果使用者抄了「成交均價」(從國泰 app 抄),覆寫到 holding 上 — 顯示時會優先用這個
+      const avgNum = Number(avg);
+      const finalNext =
+        avg !== '' && isFinite(avgNum) && avgNum > 0
+          ? {
+              ...next,
+              ...(isUsdNative
+                ? { avgPriceUsd: avgNum }
+                : { avgPriceTwd: avgNum }),
+            }
+          : next;
+      onConfirm(finalNext);
       onClose();
     } catch (e) {
       console.error(e);
@@ -223,6 +235,28 @@ export function BuyDialog({
               )}
             </p>
           </div>
+
+          {!isCash && (
+            <div>
+              <Label htmlFor="buy-avg">
+                成交均價(從 app 抄,選填)
+                {isUsdNative ? '(USD)' : '(TWD)'}
+              </Label>
+              <Input
+                id="buy-avg"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={avg}
+                onChange={(e) => setAvg(e.target.value)}
+                className="text-base h-11"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                國泰 / 券商 app 顯示的「成交均價」(不含手續費)。
+                空白 = 自動用「成本 ÷ 持股數」算(會比 app 多 ~0.5–1 元 / 股,因為含手續費)。
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="grid grid-cols-2 gap-2">

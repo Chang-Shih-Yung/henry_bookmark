@@ -47,6 +47,14 @@ export type Holding = {
   updatedAt: string; // ISO 8601
 
   /**
+   * 國泰證券 app 顯示的「成交均價」(不含手續費)。
+   * 跟 costBasisTwd / units 算出來的「含手續費均價」不同 — 國泰是純成交價平均。
+   * 有設就直接用,沒設就 fallback 算 cost ÷ units。
+   */
+  avgPriceTwd?: number;
+  avgPriceUsd?: number;
+
+  /**
    * Append-only 交易紀錄(每次加買 / 賣出 / 月扣 / 校正都 push 一筆)。
    * units / costBasisTwd 是當下的「累計快取」,真正 source of truth 是 transactions 加總。
    * 既有資料沒這欄等於空陣列。
