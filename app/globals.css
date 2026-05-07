@@ -142,8 +142,48 @@
   }
   body {
     @apply bg-background text-foreground;
+    position: relative;
+    min-height: 100dvh;
   }
   html {
     @apply font-sans;
+  }
+
+  /* ── Ambient blob 漸層背景(深色主題)── */
+  /* 三顆固定的 radial blob,用 fixed background 不影響閱讀:
+     - 左上:teal 冷光(品牌色)
+     - 右上:violet 微微的紫光(金融科技感)
+     - 右下:rose 暖點(避免整片偏冷)
+     blur 60px,opacity 控制在 ~25%,跟深色基底融合不刺眼。 */
+  .dark body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        circle at 0% 0%,
+        oklch(0.6 0.15 210 / 0.28),
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 100% 0%,
+        oklch(0.5 0.2 290 / 0.25),
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 100% 100%,
+        oklch(0.55 0.18 25 / 0.18),
+        transparent 50%
+      ),
+      radial-gradient(
+        circle at 0% 100%,
+        oklch(0.5 0.13 250 / 0.18),
+        transparent 50%
+      );
+    filter: blur(60px);
+    /* 確保 ambient 不會吃 backdrop-blur 元素的效果 */
+    will-change: transform;
   }
 }

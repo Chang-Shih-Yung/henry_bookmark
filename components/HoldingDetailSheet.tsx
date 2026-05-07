@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, AlertTriangle, Trash2, X } from 'lucide-react';
 import type { EnrichedHolding, Transaction } from '@/lib/types';
 import {
   formatTwd,
@@ -48,9 +48,34 @@ export function HoldingDetailSheet({
 }: Props) {
   const { privacy } = usePrivacy();
   const carouselRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef({ startY: 0, deltaY: 0, dragging: false });
+  const [dragOffset, setDragOffset] = useState(0);
 
   const currentHolding =
     (currentId && holdings.find((h) => h.id === currentId)) || null;
+
+  // 拖動 handle 往下拖到一定距離 → 關閉 sheet
+  const onHandleTouchStart = (e: React.TouchEvent) => {
+    dragRef.current.startY = e.touches[0].clientY;
+    dragRef.current.deltaY = 0;
+    dragRef.current.dragging = true;
+  };
+  const onHandleTouchMove = (e: React.TouchEvent) => {
+    if (!dragRef.current.dragging) return;
+    const delta = e.touches[0].clientY - dragRef.current.startY;
+    if (delta > 0) {
+      dragRef.current.deltaY = delta;
+      setDragOffset(delta);
+    }
+  };
+  const onHandleTouchEnd = () => {
+    dragRef.current.dragging = false;
+    if (dragRef.current.deltaY > 100) {
+      onClose();
+    }
+    dragRef.current.deltaY = 0;
+    setDragOffset(0);
+  };
 
   // 開啟 / currentId 變動時,scroll 對應 card 進視野(沒動畫,跳過去就好)
   useEffect(() => {
@@ -100,11 +125,54 @@ export function HoldingDetailSheet({
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl !h-[90vh] p-0 flex flex-col"
+        showCloseButton={false}
+        className={cn(
+          'rounded-t-3xl !h-[90vh] p-0 flex flex-col gap-0',
+          // 比預設 2.5rem 更大的 enter/exit 位移 — 從底部完整滑上滑下
+          'data-[side=bottom]:!data-starting-style:translate-y-full data-[side=bottom]:!data-ending-style:translate-y-full',
+          '!duration-300 ease-out',
+        )}
+        style={{
+          transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
+          transition: dragOffset ? 'none' : undefined,
+        }}
         initialFocus={false}
       >
         {/* SheetTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
         <SheetTitle className="sr-only">{currentHolding.displayName}</SheetTitle>
+
+        {/* ── Top bar:drag handle + 標題 + 關閉 ── */}
+        <div className="shrink-0">
+          {/* drag handle bar — touch 拖動關閉的入口 */}
+          <div
+            onTouchStart={onHandleTouchStart}
+            onTouchMove={onHandleTouchMove}
+            onTouchEnd={onHandleTouchEnd}
+            onTouchCancel={onHandleTouchEnd}
+            className="pt-2.5 pb-1.5 flex justify-center cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'none' }}
+          >
+            <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+          </div>
+
+          {/* 標題列 — 對齊國泰「單一持股資訊 / 所有庫存」 + 右上「關閉」 */}
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-4 pb-2">
+            <div className="w-12" /> {/* 左側佔位平衡右側按鈕 */}
+            <div className="text-center">
+              <div className="text-sm font-medium">單一持股資訊</div>
+              <div className="text-[11px] text-muted-foreground">所有庫存</div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 px-2 text-muted-foreground hover:text-foreground -mr-2"
+              aria-label="關閉"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
 
         {/* ── Carousel header — 水平 swipe 切換不同 holding ── */}
         <div

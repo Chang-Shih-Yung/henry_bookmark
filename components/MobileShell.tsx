@@ -39,34 +39,54 @@ export function MobileShell({ children, active }: Props) {
 function BottomNav({ active }: { active: TabKey }) {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-popover/95 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-50"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <div className="mx-auto max-w-2xl flex">
-        {TABS.map((t) => {
-          const isActive = active === t.href;
-          return (
-            <Link
-              key={t.href}
-              href={t.href}
-              prefetch
-              className={cn(
-                'flex-1 flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] transition-colors',
-                isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              <t.Icon
+      <div className="mx-auto max-w-2xl px-3 pb-2">
+        <div
+          className={cn(
+            // 半透明 + backdrop-blur 模糊底,頂部圓角(對齊參考圖)
+            'rounded-t-3xl rounded-b-2xl',
+            'bg-card/55 backdrop-blur-2xl',
+            'border border-white/10',
+            'shadow-[0_-8px_32px_rgba(0,0,0,0.4)]',
+            'flex',
+          )}
+        >
+          {TABS.map((t) => {
+            const isActive = active === t.href;
+            return (
+              <Link
+                key={t.href}
+                href={t.href}
+                prefetch
                 className={cn(
-                  'h-5 w-5',
-                  isActive && 'text-accent-brand',
+                  'flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] transition-colors relative',
+                  isActive
+                    ? 'text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
                 )}
-              />
-              <span className={cn(isActive && 'font-medium')}>{t.label}</span>
-            </Link>
-          );
-        })}
+              >
+                {/* active 狀態:icon 上方有一顆光暈 dot,搭配色 accent-brand */}
+                <div className="relative">
+                  {isActive && (
+                    <span
+                      aria-hidden
+                      className="absolute -inset-2 rounded-full bg-accent-brand/15 blur-md"
+                    />
+                  )}
+                  <t.Icon
+                    className={cn(
+                      'h-5 w-5 relative',
+                      isActive && 'text-accent-brand',
+                    )}
+                  />
+                </div>
+                <span className={cn(isActive && 'font-medium')}>{t.label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );
