@@ -57,11 +57,16 @@ function BottomNav({ active }: { active: TabKey }) {
               key={t.href}
               href={t.href}
               prefetch
+              draggable={false}
               className={cn(
                 'flex-1 flex flex-col items-center justify-center gap-1 py-3 text-[11px] transition-colors relative',
                 isActive
                   ? 'text-foreground'
                   : 'text-muted-foreground hover:text-foreground',
+                // iOS PWA / Safari:長按 <a> 預設跳「打開連結 / 拷貝」link preview menu,
+                // 純導航元件不需要這 menu,加 -webkit-touch-callout 關掉 +
+                // -webkit-user-select 防文字反白 + tap-highlight 透明關掉灰底閃爍
+                'select-none [-webkit-touch-callout:none] [-webkit-user-select:none] [-webkit-tap-highlight-color:transparent]',
               )}
             >
               {/* active = 純白色 icon + 文字加粗;inactive = 深灰。沒有光暈 */}

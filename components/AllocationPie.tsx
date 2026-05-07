@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Doughnut } from 'react-chartjs-2';
 import {
   ArcElement,
@@ -10,7 +11,6 @@ import {
 import type { PortfolioSummary } from '@/lib/types';
 import { formatTwd } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { maskMoney } from '@/lib/privacy';
 import {
   accentBrandAlpha,
   ACCENT_BRAND,
@@ -59,22 +59,32 @@ export function AllocationPie({
     );
   }
 
-  const data = {
-    labels: entries.map(([t]) => TYPE_LABELS[t] ?? t),
-    datasets: [
-      {
-        data: entries.map(([, v]) => v.value),
-        backgroundColor: entries.map(([t]) => TYPE_COLORS[t] ?? '#000'),
-        borderWidth: 0,
-        // 環狀外緣留 6px gap,給每段呼吸感
-        spacing: 6,
-        // 兩端做圓角(Chart.js v4 ArcElement 支援 borderRadius)
-        borderRadius: 8,
-        // hover 突出
-        hoverOffset: 6,
-      },
-    ],
-  };
+  // useMemo:data 不依賴 privacy,純靠 byType 數值。
+  // 之前每次 render 都重建 data 物件 → react-chartjs-2 偵測 prop ref 變化 →
+  // chart.update() 重觸發 600ms 動畫 → 跟 privacy 切換時的 React re-render
+  // 撞在一起,iOS Safari compositor 看到中央 absolute div 在動畫期間
+  // 「半遮半顯」,Henry 看到的「蓋一半」就是這種症狀。
+  const data = useMemo(
+    () => ({
+      labels: entries.map(([t]) => TYPE_LABELS[t] ?? t),
+      datasets: [
+        {
+          data: entries.map(([, v]) => v.value),
+          backgroundColor: entries.map(([t]) => TYPE_COLORS[t] ?? '#000'),
+          borderWidth: 0,
+          // 環狀外緣留 6px gap,給每段呼吸感
+          spacing: 6,
+          // 兩端做圓角(Chart.js v4 ArcElement 支援 borderRadius)
+          borderRadius: 8,
+          // hover 突出
+          hoverOffset: 6,
+        },
+      ],
+    }),
+    // 依賴只看 entries 內容,privacy / 其他 prop 不會觸發 chart 重繪
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(entries)],
+  );
 
   return (
     <div className="grid grid-cols-[1fr_auto] gap-4 items-center">
@@ -103,7 +113,8 @@ export function AllocationPie({
                   label: (ctx: TooltipItem<'doughnut'>) => {
                     const value = ctx.parsed;
                     const pct = ((value / summary.totalAssetTwd) * 100).toFixed(1);
-                    const amount = maskMoney(formatTwd(value), privacy);
+                    // privacy mask 直接 inline,避免 chart.js callbacks closure 抓到舊的 maskMoney
+                    const amount = privacy ? '••••' : formatTwd(value);
                     return `${ctx.label}: ${amount} (${pct}%)`;
                   },
                 },
@@ -120,13 +131,17 @@ export function AllocationPie({
             },
           }}
         />
-        {/* 中央大字 */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        {/* 中央大字 — privacy 直接 inline 三元,key 包 privacy 強制 remount
+            避免 chart.js 周邊任何 portal / closure 把 div 留在舊 render */}
+        <div
+          key={`pie-center-${privacy ? 'masked' : 'shown'}`}
+          className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+        >
           <div className="text-[10px] text-muted-foreground tracking-wide uppercase">
             總資產
           </div>
           <div className="text-base font-display font-semibold tabular-nums tracking-tight mt-0.5">
-            {maskMoney(formatTwd(summary.totalAssetTwd), privacy)}
+            {privacy ? '••••' : formatTwd(summary.totalAssetTwd)}
           </div>
         </div>
       </div>
