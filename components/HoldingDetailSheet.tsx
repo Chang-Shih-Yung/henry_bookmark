@@ -1,7 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, AlertTriangle, Trash2 } from 'lucide-react';
@@ -48,34 +52,9 @@ export function HoldingDetailSheet({
 }: Props) {
   const { privacy } = usePrivacy();
   const carouselRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef({ startY: 0, deltaY: 0, dragging: false });
-  const [dragOffset, setDragOffset] = useState(0);
 
   const currentHolding =
     (currentId && holdings.find((h) => h.id === currentId)) || null;
-
-  // 拖動 handle 往下拖到一定距離 → 關閉 sheet
-  const onHandleTouchStart = (e: React.TouchEvent) => {
-    dragRef.current.startY = e.touches[0].clientY;
-    dragRef.current.deltaY = 0;
-    dragRef.current.dragging = true;
-  };
-  const onHandleTouchMove = (e: React.TouchEvent) => {
-    if (!dragRef.current.dragging) return;
-    const delta = e.touches[0].clientY - dragRef.current.startY;
-    if (delta > 0) {
-      dragRef.current.deltaY = delta;
-      setDragOffset(delta);
-    }
-  };
-  const onHandleTouchEnd = () => {
-    dragRef.current.dragging = false;
-    if (dragRef.current.deltaY > 100) {
-      onClose();
-    }
-    dragRef.current.deltaY = 0;
-    setDragOffset(0);
-  };
 
   // 開啟 / currentId 變動時,精準把對應 card 中心對齊容器中心
   useEffect(() => {
@@ -132,39 +111,23 @@ export function HoldingDetailSheet({
   const unitTag = unitTagFor(currentHolding.type);
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent
-        side="bottom"
-        showCloseButton={false}
-        className="rounded-t-3xl !h-[90vh] p-0 flex flex-col gap-0"
-        style={{
-          transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
-          // 拖動中:no transition,跟手指走;放開時:iOS spring curve bounce 回原位
-          transition: dragOffset
-            ? 'none'
-            : 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
-        }}
-        initialFocus={false}
-      >
-        {/* SheetTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
-        <SheetTitle className="sr-only">{currentHolding.displayName}</SheetTitle>
+    <Drawer
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      // vaul 內建 drag-to-dismiss + spring transition,直接接管手勢
+    >
+      <DrawerContent className="!h-[90vh] p-0 flex flex-col gap-0 bg-popover border-t border-white/10">
+        {/* DrawerTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
+        <DrawerTitle className="sr-only">{currentHolding.displayName}</DrawerTitle>
 
-        {/* ── Top bar:drag handle + 標題 + 關閉 ── */}
+        {/* ── Top bar:vaul 自動加 drag handle 在這個位置(by default in DrawerContent),視覺一致 ── */}
         <div className="shrink-0">
-          {/* drag handle 觸發區 — 44px touch target,視覺只是中央 lozenge,純素淨不發光 */}
-          <div
-            onTouchStart={onHandleTouchStart}
-            onTouchMove={onHandleTouchMove}
-            onTouchEnd={onHandleTouchEnd}
-            onTouchCancel={onHandleTouchEnd}
-            className="h-11 flex items-center justify-center cursor-grab active:cursor-grabbing"
-            style={{ touchAction: 'none' }}
-            aria-label="向下拖動關閉"
-          >
+          {/* drag handle lozenge(vaul 監聽整個 DrawerContent 拖動,這只是視覺) */}
+          <div className="h-11 flex items-center justify-center">
             <div className="h-1.5 w-12 rounded-full bg-foreground/25" />
           </div>
 
-          {/* 標題列 — 國泰風格「單一持股資訊 / 所有庫存」(不再有 X close,拖動 bar 是唯一關閉路徑) */}
+          {/* 標題列 — 國泰風格「單一持股資訊 / 所有庫存」 */}
           <div className="text-center pb-2">
             <div className="text-sm font-medium">單一持股資訊</div>
             <div className="text-[11px] text-muted-foreground">所有庫存</div>
@@ -259,8 +222,8 @@ export function HoldingDetailSheet({
             <span className="truncate">新增一筆存款</span>
           </Button>
         </div>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
