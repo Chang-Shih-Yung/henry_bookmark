@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { errorResponse, okResponse, requireAuth } from '@/lib/api-helpers';
 import {
   enabledRemindersKey,
   parseRedisJson,
@@ -29,20 +29,19 @@ const SubscribeBody = z.object({
 });
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
+  const auth = await requireAuth();
+  if (!auth.ok) {
     console.warn('[push/subscribe] unauthorized — no session');
-    return new Response('Unauthorized', { status: 401 });
+    return auth.response;
   }
-  const email = session.user.email;
+  const email = auth.email;
   const json = await req.json().catch(() => null);
   const parsed = SubscribeBody.safeParse(json);
   if (!parsed.success) {
     console.error('[push/subscribe] invalid_body', email, parsed.error.issues);
-    return Response.json(
-      { error: 'invalid_body', issues: parsed.error.issues },
-      { status: 400 },
-    );
+    return errorResponse(400, 'invalid_body', 'Subscription 格式驗證失敗', {
+      issues: parsed.error.issues,
+    });
   }
 
   console.log(
@@ -90,15 +89,13 @@ export async function POST(req: Request) {
   // 加入「啟用提醒」的全域 set,cron 才知道要 query 誰
   await redis.sadd(enabledRemindersKey(), email.toLowerCase());
 
-  return Response.json({ ok: true, config: next });
+  return okResponse({ config: next });
 }
 
 export async function DELETE(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-  const email = session.user.email;
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+  const email = auth.email;
 
   const url = new URL(req.url);
   const endpoint = url.searchParams.get('endpoint');
@@ -134,5 +131,5 @@ export async function DELETE(req: Request) {
     }
   }
 
-  return Response.json({ ok: true });
+  return okResponse();
 }

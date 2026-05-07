@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { requireAuth } from '@/lib/api-helpers';
 import {
   parseRedisJson,
   pushSubscriptionsKey,
@@ -16,11 +16,9 @@ export const dynamic = 'force-dynamic';
  * 不檢查當天日期 / 時數,跳過 cron 排程,直接發。
  */
 export async function POST() {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-  const email = session.user.email;
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+  const email = auth.email;
 
   // 提早抓 VAPID 環境變數,缺就直接回明確錯誤
   if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {

@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { errorResponse, requireAuth } from '@/lib/api-helpers';
 import { reminderConfigKey, redis } from '@/lib/redis';
 import { DEFAULT_REMINDER_CONFIG, type ReminderConfig } from '@/lib/webpush';
 import { z } from 'zod';
@@ -11,30 +11,23 @@ const PatchBody = z.object({
 });
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-  const cfg = await redis.get<ReminderConfig>(
-    reminderConfigKey(session.user.email),
-  );
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+  const cfg = await redis.get<ReminderConfig>(reminderConfigKey(auth.email));
   return Response.json(cfg ?? DEFAULT_REMINDER_CONFIG);
 }
 
 export async function PATCH(req: Request) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return new Response('Unauthorized', { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
   const json = await req.json().catch(() => null);
   const parsed = PatchBody.safeParse(json);
   if (!parsed.success) {
-    return Response.json(
-      { error: 'invalid_body', issues: parsed.error.issues },
-      { status: 400 },
-    );
+    return errorResponse(400, 'invalid_body', '提醒設定欄位驗證失敗', {
+      issues: parsed.error.issues,
+    });
   }
-  const key = reminderConfigKey(session.user.email);
+  const key = reminderConfigKey(auth.email);
   const existing = await redis.get<ReminderConfig>(key);
   const next: ReminderConfig = {
     ...DEFAULT_REMINDER_CONFIG,

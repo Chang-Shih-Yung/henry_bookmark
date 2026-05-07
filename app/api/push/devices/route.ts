@@ -1,4 +1,4 @@
-import { auth } from '@/auth';
+import { requireAuth } from '@/lib/api-helpers';
 import {
   parseRedisJson,
   pushSubscriptionsKey,
@@ -18,13 +18,9 @@ export const dynamic = 'force-dynamic';
  * 舊資料 userAgent / subscribedAt 為 undefined,UI fallback「未知時間 / 未知裝置」
  */
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-  const subs = await redis.smembers(
-    pushSubscriptionsKey(session.user.email),
-  );
+  const auth = await requireAuth();
+  if (!auth.ok) return auth.response;
+  const subs = await redis.smembers(pushSubscriptionsKey(auth.email));
   const devices = subs
     .map((raw) => {
       const parsed = parseRedisJson<RawEntry>(raw);
