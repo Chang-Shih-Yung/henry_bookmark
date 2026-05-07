@@ -1,5 +1,6 @@
 import {
   enabledRemindersKey,
+  parseRedisJson,
   pushSubscriptionsKey,
   redis,
   reminderConfigKey,
@@ -58,12 +59,8 @@ export async function GET(req: Request) {
     // 取出該 user 所有訂閱裝置
     const subs = await redis.smembers(pushSubscriptionsKey(email));
     for (const raw of subs) {
-      let sub: WPSubscription;
-      try {
-        sub = JSON.parse(raw) as WPSubscription;
-      } catch {
-        continue;
-      }
+      const sub = parseRedisJson<WPSubscription>(raw);
+      if (!sub) continue;
       const result = await sendPushToSubscription(sub, {
         title: cfg.title,
         body: cfg.body,

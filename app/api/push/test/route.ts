@@ -1,5 +1,10 @@
 import { auth } from '@/auth';
-import { pushSubscriptionsKey, redis, reminderConfigKey } from '@/lib/redis';
+import {
+  parseRedisJson,
+  pushSubscriptionsKey,
+  redis,
+  reminderConfigKey,
+} from '@/lib/redis';
 import { sendPushToSubscription, type ReminderConfig } from '@/lib/webpush';
 import type { PushSubscription as WPSubscription } from 'web-push';
 
@@ -47,10 +52,10 @@ export async function POST() {
   const errors: Array<{ statusCode: number; message?: string }> = [];
 
   for (const raw of subs) {
-    let sub: WPSubscription;
-    try {
-      sub = JSON.parse(raw) as WPSubscription;
-    } catch {
+    // Upstash 自動 deserialize → raw 可能已經是 object,不能再 JSON.parse。用 helper 處理兩種情況
+    const sub = parseRedisJson<WPSubscription>(raw);
+    if (!sub) {
+      console.warn('[push/test] failed to parse sub entry, skipping');
       continue;
     }
     const result = await sendPushToSubscription(sub, {

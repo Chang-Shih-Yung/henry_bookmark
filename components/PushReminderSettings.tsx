@@ -276,7 +276,8 @@ export function PushReminderSettings() {
       )}
 
       <div className="space-y-3 pt-2 border-t border-white/8">
-        <div className="grid grid-cols-2 gap-3">
+        {/* 「每月幾號」欄位窄(1fr),「幾點」欄位寬(2fr)— hint「台灣時間」放下方避免擠在 label */}
+        <div className="grid grid-cols-[1fr_2fr] gap-3">
           <div>
             <FieldLabel htmlFor="reminder-day">每月幾號</FieldLabel>
             <Input
@@ -293,12 +294,12 @@ export function PushReminderSettings() {
             />
           </div>
           <div>
-            <FieldLabel hint="台灣時間">幾點</FieldLabel>
+            <FieldLabel>幾點</FieldLabel>
             <div className="flex gap-1.5">
               <ToggleGroup
                 value={[hour < 12 ? 'am' : 'pm']}
                 onValueChange={(v) => {
-                  if (v.length === 0) return; // 不允許全 deselect
+                  if (v.length === 0) return;
                   const isPM = v[0] === 'pm';
                   const h12 = hourToHour12(hour);
                   setHour(hour12ToHour(h12, isPM));
@@ -320,11 +321,11 @@ export function PushReminderSettings() {
                   setHour(hour12ToHour(h12, hour >= 12));
                   setDirty(true);
                 }}
-                className="flex-1"
+                className="w-16 shrink-0"
               />
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              {formatHour(hour)}
+              {formatHour(hour)} · 台灣時間
             </p>
           </div>
         </div>

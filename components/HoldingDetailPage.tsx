@@ -128,6 +128,16 @@ export function HoldingDetailPage({ id }: Props) {
     }, 80);
   }, [currentId]);
 
+  // 返回首頁:優先 router.back() 保留 scroll(走 bfcache)。
+  // 沒上一頁(直接打 URL 進來)就 fallback router.push('/')。
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/');
+    }
+  };
+
   // Loading
   if (holdingsQ.isLoading || pricesQ.isLoading) {
     return (
@@ -150,7 +160,7 @@ export function HoldingDetailPage({ id }: Props) {
         <header className="relative h-12 flex items-center px-2">
           <button
             type="button"
-            onClick={() => router.push('/')}
+            onClick={goBack}
             aria-label="返回"
             className="inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-accent/30 active:bg-accent/50 transition-colors -ml-1"
           >
@@ -191,7 +201,8 @@ export function HoldingDetailPage({ id }: Props) {
     );
     try {
       await updateMut.mutateAsync({ ...holdingsQ.data, items });
-      router.push('/');
+      // 刪除後不能 back(上一頁可能還在 cache 看到這筆),強制換頁
+      router.replace('/');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '刪除失敗');
     }

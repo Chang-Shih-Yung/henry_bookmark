@@ -206,27 +206,27 @@ export function Dashboard() {
               )}
             </button>
           </div>
-          {/* 文字 / 圖表 切換 — shadcn ToggleGroup */}
+          {/* 文字 / 圖表 切換 — shadcn ToggleGroup,藥丸樣式 */}
           <ToggleGroup
             value={[heroView]}
             onValueChange={(v) => {
               if (v.length > 0) setHeroView(v[0] as 'text' | 'chart');
             }}
-            className="rounded-full"
+            className="h-9 rounded-full"
           >
             <ToggleGroupItem
               value="text"
               aria-label="文字模式"
-              className="rounded-full w-8 h-7"
+              className="rounded-full w-10 px-0"
             >
-              <Hash className="h-3.5 w-3.5" />
+              <Hash className="h-4 w-4" />
             </ToggleGroupItem>
             <ToggleGroupItem
               value="chart"
               aria-label="圖表模式"
-              className="rounded-full w-8 h-7"
+              className="rounded-full w-10 px-0"
             >
-              <TrendingUp className="h-3.5 w-3.5" />
+              <TrendingUp className="h-4 w-4" />
             </ToggleGroupItem>
           </ToggleGroup>
         </div>

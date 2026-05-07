@@ -29,3 +29,24 @@ export const reminderConfigKey = (email: string) =>
 
 /** 全部啟用提醒的 user emails(cron 跑時 query 這個 set 知道要對誰發)。 */
 export const enabledRemindersKey = () => 'push:enabled-emails';
+
+/**
+ * Upstash Redis 預設 `automaticDeserialization: true`,smembers 回的會已經被 JSON.parse 過。
+ * 但寫入時用 `JSON.stringify(...)` 存的話,Upstash 在讀取時可能回 string 也可能回 object
+ * (取決於是否能成功 parse)。這個 helper 把「string OR 已解 object」統一成 object。
+ *
+ * 之前 /api/push/test 跟 /api/push/subscribe DELETE 都直接 JSON.parse(rawObject)
+ * → throw → catch continue → 整個 push 邏輯靜默失敗,sentCount 永遠 0。
+ */
+export function parseRedisJson<T>(raw: unknown): T | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === 'object') return raw as T;
+  return null;
+}

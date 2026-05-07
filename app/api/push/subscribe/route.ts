@@ -1,6 +1,7 @@
 import { auth } from '@/auth';
 import {
   enabledRemindersKey,
+  parseRedisJson,
   pushSubscriptionsKey,
   redis,
   reminderConfigKey,
@@ -86,15 +87,12 @@ export async function DELETE(req: Request) {
 
   if (endpoint) {
     // 移除單一裝置 — 從 set 找出 endpoint 對應的 entry 並刪掉
+    // Upstash 自動 deserialize,smembers 回的可能是 object 或 string,用 helper 兼容
     const all = await redis.smembers(subKey);
     for (const item of all) {
-      try {
-        const parsed = JSON.parse(item);
-        if (parsed.endpoint === endpoint) {
-          await redis.srem(subKey, item);
-        }
-      } catch {
-        // 忽略無法解析的 entry
+      const parsed = parseRedisJson<{ endpoint?: string }>(item);
+      if (parsed?.endpoint === endpoint) {
+        await redis.srem(subKey, item);
       }
     }
   } else {

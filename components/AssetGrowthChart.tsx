@@ -63,12 +63,13 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
   const [range, setRange] = useState<Range>('12m');
   const series = useMemo(() => buildSeries(enriched), [enriched]);
 
-  // 依範圍裁切 points;all 顯示全部
+  // 依範圍展開 points:從今天往前推 N 個月,每個月都要顯示(即使該月沒交易、累計仍是上一筆值)
+  // 之前是 .slice(-N) 只看實際有資料的最後 N 筆,不是 calendar-based,Henry 抱怨「0 就當不存在」
   const months = RANGES.find((r) => r.value === range)?.months ?? null;
-  const visiblePoints = useMemo(() => {
-    if (months === null) return series.points;
-    return series.points.slice(-months);
-  }, [series.points, months]);
+  const visiblePoints = useMemo(
+    () => expandToCalendarMonths(series.points, months),
+    [series.points, months],
+  );
 
   if (series.points.length === 0) {
     return (
@@ -299,6 +300,50 @@ type Series = {
   totalCost: number;
   currentMarketValue: number;
 };
+
+/**
+ * 把實際有交易的 monthly points 展開成「從今天往前 N 個月」的完整月曆。
+ *  - 沒交易的月填上一筆累計值(carry-forward)
+ *  - 第一筆交易之前的月填 0(代表還沒投入)
+ *  - months === null 表示 All:回傳原始 points,不做展開
+ */
+function expandToCalendarMonths(
+  points: SeriesPoint[],
+  months: number | null,
+): SeriesPoint[] {
+  if (months === null) return points;
+  if (points.length === 0) return [];
+
+  // 用 yy/mm 當 key,O(1) 查月份
+  const lookup = new Map<string, number>();
+  for (const p of points) lookup.set(p.label, p.cumulativeCost);
+
+  // 從今天往回推 N 個月,生 N+1 個月的 label(包含當月)
+  const today = new Date();
+  const labels: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const yy = String(d.getFullYear()).slice(2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    labels.push(`${yy}/${mm}`);
+  }
+
+  // 第一個 label 之前的累計初始值:找 ≤ 第一個 label 的最近一筆,若沒有則 0
+  const firstLabel = labels[0];
+  let running = 0;
+  for (const p of points) {
+    if (p.label <= firstLabel) running = p.cumulativeCost;
+    else break;
+  }
+  // 注意:如果第一個 label 本身就有交易,running 已經被設成那筆累計值;下面 lookup 會再覆蓋
+
+  // 沿著 labels 走,有 lookup 用 lookup,沒有就 carry forward
+  return labels.map((label) => {
+    const v = lookup.get(label);
+    if (v !== undefined) running = v;
+    return { label, cumulativeCost: running };
+  });
+}
 
 function buildSeries(enriched: EnrichedHolding[]): Series {
   const allTx: { occurredAt: Date; costDeltaTwd: number }[] = [];
