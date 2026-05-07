@@ -357,7 +357,14 @@ export function Dashboard() {
             <AllocationPie summary={summary} privacy={privacy} />
           </div>
         )}
-        <TabSummary items={filteredEnriched} privacy={privacy} />
+        {/* key 包 tab + privacy:切分類時強制整個 unmount + remount,
+            避免 React 因 children 容器 memo bailout 導致 items prop 變了
+            但 reduce 結果沒重算的怪事 */}
+        <TabSummary
+          key={`tab-summary-${tab}-${privacy ? 'm' : 's'}`}
+          items={filteredEnriched}
+          privacy={privacy}
+        />
         {filteredEnriched.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             {tab === 'all'
@@ -521,7 +528,6 @@ function TabSummary({
 
   return (
     <div
-      key={`tab-summary-${privacy ? 'm' : 's'}`}
       className={cn(
         'relative overflow-hidden rounded-2xl p-4 space-y-3',
         'bg-card/40 backdrop-blur-xl',
