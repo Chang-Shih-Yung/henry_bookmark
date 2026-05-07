@@ -20,17 +20,17 @@ const TYPE_DEFAULTS: Record<
   tw_stock: {
     symbolPlaceholder: '2330.TW',
     namePlaceholder: '台積電',
-    symbolHint: '台股代號 + .TW(目前支援 2330.TW、0050.TW 即時價)',
+    symbolHint: '台股代號 + .TW 後綴(任何 Yahoo Finance 抓得到的代號都可以)',
   },
   us_stock: {
     symbolPlaceholder: 'GOOGL',
     namePlaceholder: 'Google',
-    symbolHint: '美股代號(目前支援 GOOGL、VTI 即時價)',
+    symbolHint: '美股代號(任何 Yahoo Finance 抓得到的代號都可以,例:NVDA、TSLA、QQQ)',
   },
   crypto: {
     symbolPlaceholder: 'BTC',
     namePlaceholder: '比特幣',
-    symbolHint: '幣種代號(目前支援 BTC、ETH、ADA 即時價)',
+    symbolHint: '幣種代號(支援 BTC / ETH / ADA / DOGE / SOL / USDT / USDC,加新幣種改 COINGECKO_IDS 一行)',
   },
   cash_twd: {
     symbolPlaceholder: 'TWD-Bank',
