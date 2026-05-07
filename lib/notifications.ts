@@ -146,14 +146,24 @@ export async function sendTestPush(): Promise<{
   sentCount?: number;
   reason?: string;
 }> {
-  const res = await fetch('/api/push/test', { method: 'POST' });
-  if (!res.ok) {
-    try {
-      const data = await res.json();
-      return { ok: false, reason: data.reason ?? `Server ${res.status}` };
-    } catch {
-      return { ok: false, reason: `Server ${res.status}` };
-    }
+  let res: Response;
+  try {
+    res = await fetch('/api/push/test', { method: 'POST' });
+  } catch (e) {
+    return { ok: false, reason: '網路錯誤:' + (e instanceof Error ? e.message : String(e)) };
   }
-  return res.json();
+  let data: { ok?: boolean; sentCount?: number; reason?: string } | null = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* fall through */
+  }
+  if (!res.ok) {
+    return { ok: false, reason: data?.reason ?? `Server ${res.status}` };
+  }
+  return {
+    ok: !!data?.ok,
+    sentCount: data?.sentCount,
+    reason: data?.reason,
+  };
 }

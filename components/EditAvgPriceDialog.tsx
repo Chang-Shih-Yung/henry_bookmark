@@ -20,40 +20,41 @@ type Props = {
   onConfirm: (next: Holding) => void;
 };
 
-/**
- * 單獨編輯「成交均價」mini drawer。
- * 只有一個欄位,從國泰 / 券商 app 抄純成交均價(不含手續費),
- * 不動 units / costBasisTwd 也不新增 transaction。
- */
 export function EditAvgPriceDialog({
   holding,
   open,
   onClose,
   onConfirm,
 }: Props) {
+  // Snapshot the holding so the drawer can finish its close animation
+  // even after parent clears editAvgTarget — without this the NestedDrawer
+  // unmounts abruptly, leaves parent stuck in nested-scaled transform state
+  // (visually looks like "jumped to home + frozen")
+  const [snapshot, setSnapshot] = useState<Holding | null>(null);
   const [avg, setAvg] = useState('');
 
   useEffect(() => {
     if (open && holding) {
+      setSnapshot(holding);
       const isUsdNative = isUsdNativeType(holding.type);
       const current = isUsdNative ? holding.avgPriceUsd : holding.avgPriceTwd;
       setAvg(current !== undefined ? String(current) : '');
     }
   }, [open, holding]);
 
-  if (!holding) return null;
+  const target = holding ?? snapshot;
+  if (!target) return null;
 
-  const isUsdNative = isUsdNativeType(holding.type);
+  const isUsdNative = isUsdNativeType(target.type);
   const avgNum = avg.trim() === '' ? null : Number(avg);
   const valid = avg.trim() === '' || (isFinite(avgNum ?? 0) && (avgNum ?? 0) > 0);
 
   const handle = () => {
     if (!valid) return;
     const next: Holding = {
-      ...holding,
+      ...target,
       ...(avgNum === null
-        ? // 清空 → 拿掉 avgPrice 欄位(會 fallback 到 cost÷units)
-          isUsdNative
+        ? isUsdNative
           ? { avgPriceUsd: undefined }
           : { avgPriceTwd: undefined }
         : isUsdNative
@@ -66,19 +67,25 @@ export function EditAvgPriceDialog({
   };
 
   return (
-    <NestedDrawer open={open} onOpenChange={(o) => !o && onClose()}>
+    <NestedDrawer
+      open={open}
+      onOpenChange={(o) => !o && onClose()}
+      onAnimationEnd={(o) => {
+        if (!o) setSnapshot(null);
+      }}
+    >
       <DrawerContent
-        className="!h-auto max-h-[60vh] border-t border-white/15 shadow-[0_-12px_32px_rgba(0,0,0,0.4)]"
+        className="!h-auto max-h-[88vh] border-t border-white/15 shadow-[0_-12px_32px_rgba(0,0,0,0.4)]"
         style={{ backgroundColor: 'oklch(0.235 0 0)' }}
       >
         <div className="h-11 flex items-center justify-center shrink-0">
           <div className="h-1.5 w-12 rounded-full bg-foreground/25" />
         </div>
 
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 overflow-y-auto">
           <div className="text-center pb-3">
             <DrawerTitle className="text-base font-medium">
-              編輯成交均價 — {holding.displayName}
+              編輯成交均價 — {target.displayName}
             </DrawerTitle>
             <DrawerDescription className="text-xs text-muted-foreground mt-1">
               不動數量、成本、交易紀錄。只更新顯示用的均價。
@@ -97,7 +104,7 @@ export function EditAvgPriceDialog({
               value={avg}
               onChange={(e) => setAvg(e.target.value)}
               placeholder="例:64.59"
-              autoFocus
+              className="text-base h-11"
             />
             <p className="text-xs text-muted-foreground leading-relaxed">
               空白 = 自動用「成本 ÷ 持股數」算(會比 app 多 ~0.5–1 元 / 股,因為含手續費)。

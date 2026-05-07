@@ -83,18 +83,25 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
         }
       }}
       {...attributes}
-      {...listeners}
       className={cn(
         'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors cursor-pointer',
         // 粒粒分明:每張 row 自己一張卡,半透明 + backdrop blur 讓 ambient 漸層滲透
         'rounded-xl border border-white/10 bg-card/55 backdrop-blur-sm',
         'shadow-[0_2px_8px_rgba(0,0,0,0.15)]',
         'hover:bg-card/70 active:bg-card/80',
-        // 拖動時不要被 iOS 的 long-press 文字選取/長按選單干擾
-        'touch-none select-none [-webkit-user-select:none] [-webkit-touch-callout:none]',
+        // 拖動 grip 時不要被 iOS 文字選取干擾;但卡身保持可滾動(touch-action 不鎖)
+        'select-none [-webkit-user-select:none] [-webkit-touch-callout:none]',
       )}
     >
-      <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
+      {/* drag handle — 只有這個區域吃 dnd-kit listeners,其他地方放手讓 page scroll */}
+      <span
+        {...listeners}
+        onClick={(e) => e.stopPropagation()}
+        aria-label="拖動排序"
+        className="flex items-center justify-center -mx-1 px-1 py-2 touch-none cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
+      </span>
       {/* Name + symbol/price */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">

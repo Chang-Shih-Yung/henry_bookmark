@@ -123,7 +123,18 @@ export function HoldingDetailSheet({
       closeThreshold={0.25}
       // modal=true 鎖背景 scroll(BuyDialog 改用 NestedDrawer 後不再有 inert 衝突)
     >
-      <DrawerContent className="!h-[90vh] p-0 flex flex-col gap-0 bg-popover border-t border-white/10">
+      <DrawerContent
+        className="!h-[90vh] p-0 flex flex-col gap-0 bg-popover border-t border-white/10"
+        onPointerDownOutside={(e) => {
+          // 點擊巢狀 drawer(BuyDialog / EditAvgPriceDialog)裡的元素時,
+          // Radix 把它視為 outside 父層 → 父層 drawer 會跟著關掉。
+          // 偵測「目前還有多於一個 vaul drawer 開著」就 preventDefault,留住父層。
+          const stillOpen = document.querySelectorAll(
+            '[data-vaul-drawer][data-state=open]',
+          ).length;
+          if (stillOpen > 1) e.preventDefault();
+        }}
+      >
         {/* DrawerTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
         <DrawerTitle className="sr-only">{currentHolding.displayName}</DrawerTitle>
 
@@ -148,15 +159,15 @@ export function HoldingDetailSheet({
           className="overflow-x-auto overflow-y-hidden scrollbar-none border-b border-white/5 shrink-0 bg-background/20 backdrop-blur-md"
           style={{
             scrollSnapType: 'x mandatory',
-            scrollPaddingInline: '6%',
+            scrollPaddingInline: '10%',
           }}
         >
-          <div className="flex gap-3 px-[6%] py-4">
+          <div className="flex gap-3 px-[10%] py-4">
             {holdings.map((h) => (
               <div
                 key={h.id}
                 data-card-id={h.id}
-                className="snap-center shrink-0 w-[88%]"
+                className="snap-center shrink-0 w-[80%]"
               >
                 <HoldingHeaderCard
                   holding={h}

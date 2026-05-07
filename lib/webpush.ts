@@ -20,7 +20,10 @@ function ensureConfigured() {
 export async function sendPushToSubscription(
   subscription: WPSubscription,
   payload: { title: string; body: string; url?: string; tag?: string },
-): Promise<{ ok: true } | { ok: false; statusCode: number; expired: boolean }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; statusCode: number; expired: boolean; message?: string }
+> {
   ensureConfigured();
   try {
     await webpush.sendNotification(subscription, JSON.stringify(payload), {
@@ -29,18 +32,14 @@ export async function sendPushToSubscription(
     });
     return { ok: true };
   } catch (e: unknown) {
-    if (
-      typeof e === 'object' &&
-      e !== null &&
-      'statusCode' in e &&
-      typeof (e as { statusCode?: unknown }).statusCode === 'number'
-    ) {
-      const code = (e as { statusCode: number }).statusCode;
-      // 404 / 410 = subscription expired or unsubscribed by user
-      const expired = code === 404 || code === 410;
-      return { ok: false, statusCode: code, expired };
-    }
-    return { ok: false, statusCode: 0, expired: false };
+    const obj = (typeof e === 'object' && e !== null) ? (e as Record<string, unknown>) : {};
+    const code = typeof obj.statusCode === 'number' ? obj.statusCode : 0;
+    const body = typeof obj.body === 'string' ? obj.body.trim() : '';
+    const msg = body || (e instanceof Error ? e.message : '');
+    // 404 / 410 = subscription expired or unsubscribed by user
+    const expired = code === 404 || code === 410;
+    console.error('[webpush] send failed', { code, message: msg });
+    return { ok: false, statusCode: code, expired, message: msg || undefined };
   }
 }
 

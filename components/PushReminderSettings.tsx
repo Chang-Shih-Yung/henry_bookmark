@@ -36,6 +36,15 @@ function formatHour(h: number): string {
   return `${isPM ? '下午' : '上午'} ${h12}:00`;
 }
 
+/** iOS PWA / Android TWA 都會有 standalone display-mode;桌面瀏覽器沒有。 */
+function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return true;
+  // iOS Safari 專用:加入主畫面後 navigator.standalone === true
+  const nav = window.navigator as Navigator & { standalone?: boolean };
+  return nav.standalone === true;
+}
+
 export function PushReminderSettings() {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -164,7 +173,8 @@ export function PushReminderSettings() {
           </div>
           <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
             每月固定日期、台灣時間,自動推送通知到這台裝置。
-            iPhone 必須先把網站「加入主畫面」才會收到。
+            {!isStandalone() &&
+              ' iPhone 必須先把網站「加入主畫面」才會收到。'}
           </p>
         </div>
         {busy ? (

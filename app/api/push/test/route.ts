@@ -17,11 +17,19 @@ export async function POST() {
   }
   const email = session.user.email;
 
+  // 提早抓 VAPID 環境變數,缺就直接回明確錯誤
+  if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    return Response.json(
+      { ok: false, reason: '伺服器 VAPID 金鑰未設定 — Vercel env 缺 NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY' },
+      { status: 200 },
+    );
+  }
+
   const subs = await redis.smembers(pushSubscriptionsKey(email));
   if (subs.length === 0) {
     return Response.json(
       { ok: false, reason: '沒有訂閱裝置 — 請先啟用提醒' },
-      { status: 400 },
+      { status: 200 },
     );
   }
 
@@ -31,7 +39,7 @@ export async function POST() {
 
   let sentCount = 0;
   let expiredCount = 0;
-  const errors: string[] = [];
+  const errors: Array<{ statusCode: number; message?: string }> = [];
 
   for (const raw of subs) {
     let sub: WPSubscription;
@@ -52,7 +60,20 @@ export async function POST() {
       await redis.srem(pushSubscriptionsKey(email), raw);
       expiredCount++;
     } else {
-      errors.push(String(result.statusCode));
+      errors.push({ statusCode: result.statusCode, message: result.message });
+    }
+  }
+
+  // 沒成功 → 給人話的 reason
+  let reason: string | undefined;
+  if (sentCount === 0) {
+    if (expiredCount > 0 && errors.length === 0) {
+      reason = `所有 ${expiredCount} 台裝置訂閱已過期 — 請重新啟用提醒(關掉再開)`;
+    } else if (errors.length > 0) {
+      const first = errors[0];
+      reason = `推送失敗 (HTTP ${first.statusCode})${first.message ? ': ' + first.message : ''}`;
+    } else {
+      reason = '推送失敗 — 沒有任何裝置成功';
     }
   }
 
@@ -61,5 +82,6 @@ export async function POST() {
     sentCount,
     expiredCount,
     errors,
+    reason,
   });
 }
