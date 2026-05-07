@@ -83,7 +83,13 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
     <button
       type="button"
       onClick={onCardClick}
-      className="w-full flex items-center gap-3 px-3 py-3 rounded-lg bg-card hover:bg-accent/30 active:bg-accent/50 transition-colors text-left"
+      className={cn(
+        'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
+        // 粒粒分明:每張 row 自己一張卡,半透明 + backdrop blur 讓 ambient 漸層滲透
+        'rounded-xl border border-white/10 bg-card/55 backdrop-blur-sm',
+        'shadow-[0_2px_8px_rgba(0,0,0,0.15)]',
+        'hover:bg-card/70 active:bg-card/80',
+      )}
     >
       {/* Type icon */}
       <div className="h-10 w-10 shrink-0 rounded-full bg-muted inline-flex items-center justify-center text-muted-foreground">
