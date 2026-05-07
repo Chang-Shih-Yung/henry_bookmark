@@ -16,6 +16,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -26,10 +27,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useHoldings } from '@/lib/api';
-import { simulate } from '@/lib/calc';
+import { useHoldings, usePrices } from '@/lib/api';
+import { computeSummary, enrichHolding, simulate } from '@/lib/calc';
 import { defaultConfig } from '@/lib/config';
 import { formatTwd } from '@/lib/format';
+import { usePrivacy } from '@/lib/privacy';
 import type { Scenario } from '@/lib/types';
 import {
   ACCENT_BRAND,
@@ -51,12 +53,28 @@ ChartJS.register(
 
 export function SimulatePage() {
   const holdingsQ = useHoldings();
+  const pricesQ = usePrices();
+  const { privacy } = usePrivacy();
   const [scenario, setScenario] = useState<Scenario>('neutral');
 
   const result = useMemo(() => {
     if (!holdingsQ.data) return [];
     return simulate(holdingsQ.data.items, defaultConfig, scenario, 10);
   }, [holdingsQ.data, scenario]);
+
+  // 「達成 / 還差」從 Dashboard hero 搬過來:用當下實際 marketValueTwd 算 progress,
+  // 配合下方試算「未來 10 年走勢」很有 context — 看到目前 X% + 預估幾年達成。
+  const currentSummary = useMemo(() => {
+    if (!holdingsQ.data || !pricesQ.data) return null;
+    const enriched = holdingsQ.data.items.map((h) =>
+      enrichHolding(h, pricesQ.data!),
+    );
+    return computeSummary(enriched, defaultConfig.goalTwd);
+  }, [holdingsQ.data, pricesQ.data]);
+
+  const remainingToGoal = currentSummary
+    ? Math.max(defaultConfig.goalTwd - currentSummary.totalAssetTwd, 0)
+    : 0;
 
   if (holdingsQ.isLoading) {
     return (
@@ -105,6 +123,40 @@ export function SimulatePage() {
           長期試算 · 10 年
         </h1>
       </header>
+
+      {/* 從 Dashboard hero 搬來的「達成 / 還差」row — 試算頁面看著「目前進度 + 預估走勢」更直覺
+          privacy 跟首頁的眼睛 toggle 共用同一個 Context,自動同步 */}
+      {currentSummary && (
+        <section className="space-y-2">
+          <Progress
+            value={Math.min(currentSummary.goalProgressPct * 100, 100)}
+            className="h-2"
+          />
+          <div
+            key={`sim-goal-${privacy ? 'm' : 's'}`}
+            className="flex items-baseline justify-between gap-3 text-xs tabular-nums"
+          >
+            <div className="font-display">
+              <span className="text-base font-semibold text-foreground">
+                {(currentSummary.goalProgressPct * 100).toFixed(1)}%
+              </span>
+              <span className="ml-1.5 text-[11px] text-muted-foreground">
+                達成
+              </span>
+            </div>
+            <div className="text-muted-foreground text-right">
+              還差{' '}
+              <span className="text-foreground font-medium">
+                {privacy ? '••••' : formatTwd(remainingToGoal)}
+              </span>
+              <span className="text-muted-foreground/50">
+                {' '}
+                / {privacy ? '••••' : formatTwd(defaultConfig.goalTwd)}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
 
       <Tabs
         value={scenario}

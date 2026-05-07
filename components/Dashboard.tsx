@@ -160,11 +160,6 @@ export function Dashboard() {
     update(next);
   };
 
-  const remainingToGoal = Math.max(
-    defaultConfig.goalTwd - summary.totalAssetTwd,
-    0,
-  );
-
   const update = async (next: Holdings) => {
     try {
       await updateMut.mutateAsync(next);
@@ -304,28 +299,68 @@ export function Dashboard() {
           value={Math.min(summary.goalProgressPct * 100, 100)}
           className="h-2"
         />
-        {/* Goal progress 重排:百分比變主角(text-base + 高對比),目標金額退到副位
-            原本「2.1% · 離 $10M 還差 $9.7M」三個數字平鋪沒層次 */}
-        <div className="flex items-baseline justify-between gap-3 text-xs tabular-nums">
-          <div className="font-display">
-            <span className="text-base font-semibold text-foreground">
-              {(summary.goalProgressPct * 100).toFixed(1)}%
-            </span>
-            <span className="ml-1.5 text-[11px] text-muted-foreground">
-              達成
-            </span>
+        {/* 達成 / 還差移到 /simulate 頁。這裡改放「成本 / 參考損益」橫排 —
+            從原本 TabSummary 卡牌搬上來,當前 tab 過濾後的數字。 */}
+        {filteredEnriched.length > 0 && (
+          <div
+            key={`hero-cost-pnl-${privacy ? 'm' : 's'}`}
+            className="grid grid-cols-2 gap-3 pt-1"
+          >
+            <div>
+              <div className="text-[11px] text-muted-foreground">
+                成本 (TWD)
+              </div>
+              <div className="text-base font-medium tabular-nums mt-0.5">
+                {privacy
+                  ? '••••'
+                  : formatTwd(
+                      filteredEnriched.reduce(
+                        (s, h) => s + h.costBasisTwd,
+                        0,
+                      ),
+                    )}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground">
+                參考損益 (TWD)
+              </div>
+              {(() => {
+                const total = filteredEnriched.reduce(
+                  (s, h) => s + h.marketValueTwd,
+                  0,
+                );
+                const cost = filteredEnriched.reduce(
+                  (s, h) => s + h.costBasisTwd,
+                  0,
+                );
+                const pnl = total - cost;
+                const pnlPct = cost > 0 ? pnl / cost : 0;
+                const showPnl = cost > 0 && pnl !== 0;
+                if (!showPnl) {
+                  return (
+                    <div className="text-base text-muted-foreground tabular-nums mt-0.5">
+                      —
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    className={cn(
+                      'text-base font-medium tabular-nums mt-0.5 whitespace-nowrap',
+                      pnl >= 0 ? 'text-up' : 'text-down',
+                    )}
+                  >
+                    {privacy ? '••••' : formatChange(pnl)}
+                    <span className="text-xs ml-1 opacity-80">
+                      ({formatPct(pnlPct)})
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
-          <div className="text-muted-foreground text-right">
-            還差{' '}
-            <span className="text-foreground font-medium">
-              {maskMoney(formatTwd(remainingToGoal), privacy)}
-            </span>
-            <span className="text-muted-foreground/50">
-              {' '}
-              / {maskMoney(formatTwd(defaultConfig.goalTwd), privacy)}
-            </span>
-          </div>
-        </div>
+        )}
       </section>
 
       {/* Price source warning */}
@@ -382,7 +417,6 @@ export function Dashboard() {
             <AllocationPie summary={summary} privacy={privacy} />
           </div>
         )}
-        <TabSummary items={filteredEnriched} privacy={privacy} />
         {filteredEnriched.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             {tab === 'all'
@@ -521,76 +555,6 @@ function NewButtons({
     >
       <Plus className="h-3.5 w-3.5" /> 新增{labels[tab]}
     </Button>
-  );
-}
-
-/**
- * 分類 tab 的小計 — 對齊國泰證券 app「敦南分公司 5705016」那層。
- * 顯示:參考總現值 / 成本 / 參考損益(金額 + %)。
- * 全幣別統一用 TWD canonical(跟全站總資產口徑一致)。
- */
-function TabSummary({
-  items,
-  privacy,
-}: {
-  items: EnrichedHolding[];
-  privacy: boolean;
-}) {
-  if (items.length === 0) return null;
-  const total = items.reduce((sum, h) => sum + h.marketValueTwd, 0);
-  const cost = items.reduce((sum, h) => sum + h.costBasisTwd, 0);
-  const pnl = total - cost;
-  const pnlPct = cost > 0 ? pnl / cost : 0;
-  const positive = pnl >= 0;
-  const showPnL = cost > 0 && pnl !== 0;
-
-  return (
-    <div
-      className={cn(
-        'relative overflow-hidden rounded-2xl p-4 space-y-3',
-        'bg-card/40 backdrop-blur-xl',
-        'border border-white/10',
-        'shadow-[0_4px_24px_rgba(0,0,0,0.25)]',
-      )}
-    >
-      {/* 內部微微的高光,讓玻璃質感更立體 */}
-      <div
-        aria-hidden
-        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
-      />
-      <div className="relative">
-        <div className="text-xs text-muted-foreground">參考總現值 (TWD)</div>
-        <div className="text-3xl font-bold font-display tabular-nums mt-1">
-          {maskMoney(formatTwd(total), privacy)}
-        </div>
-      </div>
-      <div className="relative grid grid-cols-2 gap-3 pt-3 border-t border-white/8">
-        <div>
-          <div className="text-xs text-muted-foreground">成本 (TWD)</div>
-          <div className="text-lg font-medium tabular-nums mt-0.5">
-            {maskMoney(formatTwd(cost), privacy)}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">參考損益 (TWD)</div>
-          {showPnL ? (
-            <div
-              className={cn(
-                'text-lg font-medium tabular-nums mt-0.5',
-                positive ? 'text-up' : 'text-down',
-              )}
-            >
-              {maskMoney(formatChange(pnl), privacy)}{' '}
-              <span className="text-sm">({formatPct(pnlPct)})</span>
-            </div>
-          ) : (
-            <div className="text-lg text-muted-foreground tabular-nums mt-0.5">
-              —
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 

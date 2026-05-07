@@ -131,19 +131,7 @@ export function AllocationPie({
             },
           }}
         />
-        {/* 中央大字 — privacy 直接 inline 三元,key 包 privacy 強制 remount
-            避免 chart.js 周邊任何 portal / closure 把 div 留在舊 render */}
-        <div
-          key={`pie-center-${privacy ? 'masked' : 'shown'}`}
-          className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
-        >
-          <div className="text-[10px] text-muted-foreground tracking-wide uppercase">
-            總資產
-          </div>
-          <div className="text-base font-display font-semibold tabular-nums tracking-tight mt-0.5">
-            {privacy ? '••••' : formatTwd(summary.totalAssetTwd)}
-          </div>
-        </div>
+        {/* 中央區塊拿掉「總資產 + 金額」— 跟 hero 數字重複,雞肋 */}
       </div>
 
       {/* 自寫 legend — 對齊截圖二:左邊 dot + 標籤 + 金額 + % */}
