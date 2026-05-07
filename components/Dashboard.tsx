@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   AlertCircle,
@@ -33,10 +34,7 @@ import { Badge } from '@/components/ui/badge';
 import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { AllocationPie } from '@/components/AllocationPie';
 import { HoldingRow } from '@/components/HoldingRow';
-import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
-import { BuyDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
-import { EditAvgPriceDialog } from '@/components/EditAvgPriceDialog';
 import { AssetGrowthChart } from '@/components/AssetGrowthChart';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
@@ -79,23 +77,13 @@ function tabMatches(tab: TabValue, type: AssetType): boolean {
   return tab === type;
 }
 
-/** 同一個 tab 分類嗎 — detail carousel 把同類 holdings 串起來。 */
-function sameTabType(a: AssetType, b: AssetType): boolean {
-  if (a === b) return true;
-  const isCashA = a === 'cash_twd' || a === 'cash_usd';
-  const isCashB = b === 'cash_twd' || b === 'cash_usd';
-  return isCashA && isCashB;
-}
-
 export function Dashboard() {
+  const router = useRouter();
   const holdingsQ = useHoldings();
   const pricesQ = usePrices();
   const updateMut = useUpdateHoldings();
   const { privacy, toggle: togglePrivacy } = usePrivacy();
 
-  const [buyTarget, setBuyTarget] = useState<Holding | null>(null);
-  const [editAvgTarget, setEditAvgTarget] = useState<Holding | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
   const [tab, setTab] = useState<TabValue>('all');
   const [heroView, setHeroView] = useState<'text' | 'chart'>('text');
@@ -104,12 +92,6 @@ export function Dashboard() {
     if (!holdingsQ.data || !pricesQ.data) return [];
     return holdingsQ.data.items.map((h) => enrichHolding(h, pricesQ.data));
   }, [holdingsQ.data, pricesQ.data]);
-
-  // detailTarget 是 enriched 即時 derived,replaceHolding 後 enriched 重算 → detail 自動同步。
-  const detailTarget: EnrichedHolding | null = useMemo(
-    () => (detailId ? enriched.find((h) => h.id === detailId) ?? null : null),
-    [detailId, enriched],
-  );
 
   const summary = useMemo(
     () => computeSummary(enriched, defaultConfig.goalTwd),
@@ -167,20 +149,6 @@ export function Dashboard() {
       h.id === id ? { ...h, ...patch, updatedAt: new Date().toISOString() } : h,
     );
     update({ ...holdingsQ.data, items });
-  };
-
-  const replaceHolding = (id: string, next: Holding) => {
-    if (!holdingsQ.data) return;
-    const items = holdingsQ.data.items.map((h) => (h.id === id ? next : h));
-    update({ ...holdingsQ.data, items });
-  };
-
-  const deleteHolding = (id: string): boolean => {
-    if (!holdingsQ.data) return false;
-    if (!confirm('確定刪除這筆資產?所有交易紀錄會一起消失。')) return false;
-    const items = holdingsQ.data.items.filter((h) => h.id !== id);
-    update({ ...holdingsQ.data, items });
-    return true;
   };
 
   const addHolding = (h: Holding) => {
@@ -388,7 +356,7 @@ export function Dashboard() {
                     key={h.id}
                     holding={h}
                     usdTwd={pricesQ.data?.usdTwd}
-                    onCardClick={() => setDetailId(h.id)}
+                    onCardClick={() => router.push(`/holding/${h.id}`)}
                   />
                 ))}
               </div>
@@ -412,49 +380,12 @@ export function Dashboard() {
         )}
       </footer>
 
-      {/* Dialogs */}
-      <BuyDialog
-        holding={buyTarget}
-        open={!!buyTarget}
-        usdTwd={pricesQ.data?.usdTwd}
-        onClose={() => setBuyTarget(null)}
-        onConfirm={(next) => replaceHolding(next.id, next)}
-      />
+      {/* Dialogs — 詳情編輯都搬到 /holding/[id] 子頁,首頁只剩新增 */}
       <NewHoldingDialog
         type={newType}
         open={!!newType}
         onClose={() => setNewType(null)}
         onConfirm={addHolding}
-      />
-      <HoldingDetailSheet
-        holdings={
-          detailTarget
-            ? enriched.filter((h) => sameTabType(detailTarget.type, h.type))
-            : []
-        }
-        currentId={detailId}
-        open={!!detailTarget}
-        usdTwd={pricesQ.data?.usdTwd}
-        onClose={() => setDetailId(null)}
-        onChangeCurrentId={setDetailId}
-        onAddDepositClick={() => {
-          if (detailTarget) setBuyTarget(detailTarget);
-        }}
-        onEditAvgClick={(id) => {
-          const target = enriched.find((h) => h.id === id);
-          if (target) setEditAvgTarget(target);
-        }}
-        onDeleteClick={() => {
-          if (detailTarget && deleteHolding(detailTarget.id)) {
-            setDetailId(null);
-          }
-        }}
-      />
-      <EditAvgPriceDialog
-        holding={editAvgTarget}
-        open={!!editAvgTarget}
-        onClose={() => setEditAvgTarget(null)}
-        onConfirm={(next) => replaceHolding(next.id, next)}
       />
     </main>
   );

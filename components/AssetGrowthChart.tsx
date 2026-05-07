@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -45,12 +46,29 @@ type Props = {
   height?: number;
 };
 
+type Range = '3m' | '6m' | '12m' | '18m' | 'all';
+const RANGES: Array<{ value: Range; label: string; months: number | null }> = [
+  { value: '3m', label: '3M', months: 3 },
+  { value: '6m', label: '6M', months: 6 },
+  { value: '12m', label: '12M', months: 12 },
+  { value: '18m', label: '18M', months: 18 },
+  { value: 'all', label: 'All', months: null },
+];
+
 /**
  * 累計資產投入曲線(Chart.js + 客製樣式)。
  * 線條顏色按趨勢方向變:漲 = 藍紫 / 平 = 白 / 跌 = 淺橘紅。
  */
 export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
+  const [range, setRange] = useState<Range>('12m');
   const series = useMemo(() => buildSeries(enriched), [enriched]);
+
+  // 依範圍裁切 points;all 顯示全部
+  const months = RANGES.find((r) => r.value === range)?.months ?? null;
+  const visiblePoints = useMemo(() => {
+    if (months === null) return series.points;
+    return series.points.slice(-months);
+  }, [series.points, months]);
 
   if (series.points.length === 0) {
     return (
@@ -62,10 +80,10 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
 
   // 一筆 → 補虛擬零起點
   const augmented =
-    series.points.length === 1
+    visiblePoints.length === 1
       ? [
           (() => {
-            const [yy, mm] = series.points[0].label.split('/').map(Number);
+            const [yy, mm] = visiblePoints[0].label.split('/').map(Number);
             const prevYY = mm === 1 ? yy - 1 : yy;
             const prevMM = mm === 1 ? 12 : mm - 1;
             return {
@@ -73,9 +91,9 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
               cumulativeCost: 0,
             };
           })(),
-          ...series.points,
+          ...visiblePoints,
         ]
-      : series.points;
+      : visiblePoints;
 
   const labels = augmented.map((p) => p.label);
   const values = augmented.map((p) => p.cumulativeCost);
@@ -252,6 +270,25 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
       >
         <Line data={data} options={options} />
       </div>
+
+      {/* 區間選擇 — 5 顆 segmented control,iOS 原生感 */}
+      <ToggleGroup
+        value={[range]}
+        onValueChange={(v) => {
+          if (v.length > 0) setRange(v[0] as Range);
+        }}
+        className="mt-3 w-full h-9"
+      >
+        {RANGES.map((r) => (
+          <ToggleGroupItem
+            key={r.value}
+            value={r.value}
+            className="flex-1 px-0 text-xs"
+          >
+            {r.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
     </div>
   );
 }
