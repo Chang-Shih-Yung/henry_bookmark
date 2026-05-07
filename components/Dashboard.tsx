@@ -6,7 +6,6 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  ChevronRight,
   LayoutGrid,
   Building2,
   Globe,
@@ -54,25 +53,6 @@ const TABS: Array<{ value: TabValue; label: string; Icon: LucideIcon }> = [
   { value: 'crypto', label: '加密', Icon: Bitcoin },
   { value: 'cash', label: '現金', Icon: Wallet },
   { value: 'trust', label: '信託', Icon: Landmark },
-];
-
-/** 「全部」分頁 → 點分類卡可跳到對應 tab。 */
-const TAB_SUMMARIES: Array<{
-  tab: Exclude<TabValue, 'all'>;
-  label: string;
-  Icon: LucideIcon;
-  types: AssetType[];
-}> = [
-  { tab: 'tw_stock', label: '台股', Icon: Building2, types: ['tw_stock'] },
-  { tab: 'us_stock', label: '美股', Icon: Globe, types: ['us_stock'] },
-  { tab: 'crypto', label: '加密貨幣', Icon: Bitcoin, types: ['crypto'] },
-  {
-    tab: 'cash',
-    label: '現金',
-    Icon: Wallet,
-    types: ['cash_twd', 'cash_usd'],
-  },
-  { tab: 'trust', label: '富邦信託', Icon: Landmark, types: ['trust'] },
 ];
 
 function tabMatches(tab: TabValue, type: AssetType): boolean {
@@ -263,14 +243,10 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Sticky tab bar — 文字 + 底線 + 發光;整塊不上底色,讓 ambient 漸層直接透過 */}
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3">
+      {/* Sticky tab bar — 純文字 + 底線發光,不滿版,不上底色,沒數字 count */}
+      <div className="sticky top-0 z-10 py-3">
         <div className="flex gap-6 overflow-x-auto scrollbar-none">
           {TABS.map((t) => {
-            const count =
-              t.value === 'all'
-                ? enriched.length
-                : enriched.filter((h) => tabMatches(t.value, h.type)).length;
             const active = tab === t.value;
             return (
               <button
@@ -278,35 +254,17 @@ export function Dashboard() {
                 type="button"
                 onClick={() => setTab(t.value)}
                 className={cn(
-                  'shrink-0 relative inline-flex items-center gap-1 pb-1.5 text-[15px] transition-colors',
+                  'shrink-0 relative pb-1.5 text-[15px] transition-colors',
                   active
                     ? 'text-foreground font-medium'
                     : 'text-muted-foreground/70 hover:text-foreground',
                 )}
               >
-                {/* active 狀態:文字底下發光暈 */}
+                <span>{t.label}</span>
                 {active && (
                   <span
                     aria-hidden
-                    className="absolute inset-x-0 -inset-y-1 rounded-md bg-accent-brand/20 blur-md -z-10"
-                  />
-                )}
-                <span className="relative">{t.label}</span>
-                {count > 0 && (
-                  <span
-                    className={cn(
-                      'tabular-nums text-[10px] relative',
-                      active ? 'text-accent-brand' : 'text-muted-foreground/50',
-                    )}
-                  >
-                    {count}
-                  </span>
-                )}
-                {/* active 底線 */}
-                {active && (
-                  <span
-                    aria-hidden
-                    className="absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full bg-accent-brand shadow-[0_0_8px_oklch(0.78_0.13_210/0.6)]"
+                    className="absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full bg-accent-brand shadow-[0_0_8px_oklch(0.78_0.18_210/0.6)]"
                   />
                 )}
               </button>
@@ -315,103 +273,42 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Tab content */}
-      {tab === 'all' ? (
-        <>
-          {summary.totalAssetTwd > 0 && (
-            <section className="space-y-2">
-              <h2 className="text-sm font-medium font-display">資產分布</h2>
-              <AllocationPie summary={summary} />
-            </section>
-          )}
-          <section className="space-y-2">
-            <h2 className="text-sm font-medium font-display">分類</h2>
-            <div className="space-y-2">
-              {TAB_SUMMARIES.map((s) => {
-                const items = enriched.filter((h) => s.types.includes(h.type));
-                const subtotal = items.reduce(
-                  (sum, h) => sum + h.marketValueTwd,
-                  0,
-                );
-                const cost = items.reduce((sum, h) => sum + h.costBasisTwd, 0);
-                const pnlPct = cost > 0 ? (subtotal - cost) / cost : 0;
-                const positive = subtotal - cost >= 0;
-                return (
-                  <button
-                    key={s.tab}
-                    type="button"
-                    onClick={() => setTab(s.tab)}
-                    className={cn(
-                      'w-full flex items-center justify-between p-3.5 text-left transition-colors',
-                      'rounded-xl border border-white/10 bg-card/55 backdrop-blur-sm',
-                      'shadow-[0_2px_8px_rgba(0,0,0,0.15)]',
-                      'hover:bg-card/70 active:bg-card/80',
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-background/40 backdrop-blur-sm border border-white/10 inline-flex items-center justify-center text-foreground/80 shadow-inner">
-                        <s.Icon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">{s.label}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {items.length} 筆
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <div className="text-sm font-semibold tabular-nums">
-                          {maskMoney(formatTwd(subtotal), privacy)}
-                        </div>
-                        {cost > 0 && (
-                          <div
-                            className={cn(
-                              'text-xs tabular-nums',
-                              positive ? 'text-up' : 'text-down',
-                            )}
-                          >
-                            {positive ? '▲' : '▼'} {formatPct(pnlPct)}
-                          </div>
-                        )}
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </>
-      ) : (
-        <section className="space-y-3">
-          <TabSummary
-            items={enriched.filter((h) => tabMatches(tab, h.type))}
-            privacy={privacy}
-          />
-          {enriched.filter((h) => tabMatches(tab, h.type)).length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">
-              這個分類還沒有資產。
-              <br />
-              用下面的按鈕新增第一筆。
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {enriched
-                .filter((h) => tabMatches(tab, h.type))
-                .map((h) => (
-                  <HoldingRow
-                    key={h.id}
-                    holding={h}
-                    usdTwd={pricesQ.data?.usdTwd}
-                    onCardClick={() => setDetailId(h.id)}
-                  />
-                ))}
-            </div>
-          )}
+      {/* Tab content — 統一邏輯:每個 tab 都是「TabSummary + holdings list」,全部 tab 加 AllocationPie */}
+      <section className="space-y-3">
+        {tab === 'all' && summary.totalAssetTwd > 0 && (
+          <div className="rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-4">
+            <h2 className="text-xs text-muted-foreground mb-2">資產分布</h2>
+            <AllocationPie summary={summary} />
+          </div>
+        )}
+        <TabSummary
+          items={enriched.filter((h) => tabMatches(tab, h.type))}
+          privacy={privacy}
+        />
+        {enriched.filter((h) => tabMatches(tab, h.type)).length === 0 ? (
+          <div className="text-center py-12 text-sm text-muted-foreground">
+            {tab === 'all'
+              ? '還沒有任何資產 — 切換到下方分頁新增第一筆。'
+              : '這個分類還沒有資產。'}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {enriched
+              .filter((h) => tabMatches(tab, h.type))
+              .map((h) => (
+                <HoldingRow
+                  key={h.id}
+                  holding={h}
+                  usdTwd={pricesQ.data?.usdTwd}
+                  onCardClick={() => setDetailId(h.id)}
+                />
+              ))}
+          </div>
+        )}
+        {tab !== 'all' && (
           <NewButtons tab={tab} onNew={(type) => setNewType(type)} />
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Footer info */}
       <footer className="pt-6 text-center text-xs text-muted-foreground">
