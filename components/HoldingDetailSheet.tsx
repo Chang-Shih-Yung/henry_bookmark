@@ -1,10 +1,7 @@
 'use client';
 
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from '@/components/ui/sheet';
+import { useCallback, useEffect, useRef } from 'react';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, AlertTriangle, Trash2 } from 'lucide-react';
@@ -25,85 +22,79 @@ import {
 } from '@/components/HoldingEditSheet';
 
 type Props = {
-  holding: EnrichedHolding | null;
+  /** 同分類的所有 holdings — 構成水平 carousel 的清單。 */
+  holdings: EnrichedHolding[];
+  /** 當前 visible card 的 id。 */
+  currentId: string | null;
   open: boolean;
   usdTwd: number | null | undefined;
   onClose: () => void;
+  /** 滑動切換 / scroll snap 結束時通知 parent 更新 currentId。 */
+  onChangeCurrentId: (id: string) => void;
   /** 新增一筆存款 — 輸入「買後累計總量、累計總額」,系統算這筆 delta。 */
   onAddDepositClick: () => void;
   onDeleteClick: () => void;
 };
 
 export function HoldingDetailSheet({
-  holding,
+  holdings,
+  currentId,
   open,
   usdTwd,
   onClose,
+  onChangeCurrentId,
   onAddDepositClick,
   onDeleteClick,
 }: Props) {
   const { privacy } = usePrivacy();
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-  if (!holding) return null;
+  const currentHolding =
+    (currentId && holdings.find((h) => h.id === currentId)) || null;
 
-  const isUsdNative = isUsdNativeType(holding.type);
-  const fxRate = usdTwd ?? 0;
-  const stockOrCrypto =
-    holding.type === 'tw_stock' ||
-    holding.type === 'us_stock' ||
-    holding.type === 'crypto';
+  // 開啟 / currentId 變動時,scroll 對應 card 進視野(沒動畫,跳過去就好)
+  useEffect(() => {
+    if (!open || !currentId || !carouselRef.current) return;
+    const el = carouselRef.current.querySelector<HTMLElement>(
+      `[data-card-id="${CSS.escape(currentId)}"]`,
+    );
+    if (el) {
+      el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
+    }
+  }, [open, currentId]);
 
-  const costUsdView = isUsdNative
-    ? holding.costBasisUsd ??
-      (fxRate > 0 && holding.costBasisTwd > 0
-        ? holding.costBasisTwd / fxRate
-        : 0)
-    : 0;
+  // onScroll 偵測哪張卡距離容器中心最近 → 通知 parent 切 currentId
+  const handleCarouselScroll = useCallback(() => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const cards = el.querySelectorAll<HTMLElement>('[data-card-id]');
+    if (cards.length === 0) return;
+    const containerRect = el.getBoundingClientRect();
+    const containerCenter = containerRect.left + containerRect.width / 2;
+    let bestId: string | null = null;
+    let bestDist = Infinity;
+    cards.forEach((card) => {
+      const rect = card.getBoundingClientRect();
+      const cardCenter = rect.left + rect.width / 2;
+      const dist = Math.abs(cardCenter - containerCenter);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestId = card.dataset.cardId ?? null;
+      }
+    });
+    if (bestId && bestId !== currentId) {
+      onChangeCurrentId(bestId);
+    }
+  }, [currentId, onChangeCurrentId]);
 
-  const costStr = isUsdNative
-    ? `$ ${costUsdView.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
-    : formatTwd(holding.costBasisTwd);
+  if (!currentHolding) return null;
 
-  // 成交均價:優先用使用者從國泰/券商 app 抄來的(不含手續費),
-  // 沒抄就 fallback 算 cost ÷ units(會多含手續費,跟 app 差 ~0.5–1 元 / 股)
-  const manualAvg = isUsdNative ? holding.avgPriceUsd : holding.avgPriceTwd;
-  const showAvg =
-    stockOrCrypto &&
-    (manualAvg !== undefined ||
-      (holding.units > 0 &&
-        (isUsdNative ? costUsdView > 0 : holding.costBasisTwd > 0)));
-  const avg = !showAvg
-    ? 0
-    : manualAvg !== undefined
-      ? manualAvg
-      : isUsdNative
-        ? costUsdView / holding.units
-        : holding.costBasisTwd / holding.units;
-  const avgStr = formatPrice(avg, isUsdNative ? 'USD' : 'TWD');
-
-  const priceStr = formatPriceForDisplay(
-    holding.currentPriceTwd,
-    isUsdNative,
-    fxRate,
-  );
-
-  const unitTag =
-    holding.type === 'crypto'
-      ? '顆'
-      : holding.type === 'tw_stock' || holding.type === 'us_stock'
-        ? '股'
-        : holding.type === 'cash_usd'
-          ? 'USD'
-          : 'TWD';
-
-  const pnlPositive = holding.unrealizedPnlTwd >= 0;
-  const todayPositive = (holding.todayChangePct ?? 0) >= 0;
-  const hasTodayChange = holding.todayChangePct !== null;
-
-  const transactions = [...(holding.transactions ?? [])].sort(
+  const isUsdNative = isUsdNativeType(currentHolding.type);
+  const transactions = [...(currentHolding.transactions ?? [])].sort(
     (a, b) =>
       new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
   );
+  const unitTag = unitTagFor(currentHolding.type);
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -112,22 +103,45 @@ export function HoldingDetailSheet({
         className="rounded-t-2xl !h-[90vh] p-0 flex flex-col"
         initialFocus={false}
       >
-        {/* ── Header (sticky top) — 對齊國泰 app 版面 ── */}
-        <HoldingHeader
-          holding={holding}
-          fxRate={fxRate}
-          isUsdNative={isUsdNative}
-          stockOrCrypto={stockOrCrypto}
-          unitTag={unitTag}
-          priceStr={priceStr}
-          avgStr={avgStr}
-          showAvg={showAvg}
-          costStr={costStr}
-          pnlPositive={pnlPositive}
-          privacy={privacy}
-        />
+        {/* SheetTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
+        <SheetTitle className="sr-only">{currentHolding.displayName}</SheetTitle>
 
-        {/* ── Scrollable transaction list ── */}
+        {/* ── Carousel header — 水平 swipe 切換不同 holding ── */}
+        <div
+          ref={carouselRef}
+          onScroll={handleCarouselScroll}
+          className="overflow-x-auto overflow-y-hidden scrollbar-none border-b shrink-0 bg-muted/20"
+          style={{
+            scrollSnapType: 'x mandatory',
+            scrollPaddingInline: '6%',
+          }}
+        >
+          <div className="flex gap-3 px-[6%] py-4">
+            {holdings.map((h) => (
+              <div
+                key={h.id}
+                data-card-id={h.id}
+                className="snap-center shrink-0 w-[88%]"
+              >
+                <HoldingHeaderCard
+                  holding={h}
+                  usdTwd={usdTwd}
+                  privacy={privacy}
+                />
+              </div>
+            ))}
+          </div>
+          {holdings.length > 1 && (
+            <div className="text-[10px] text-muted-foreground/70 text-center pb-2 tabular-nums">
+              {(() => {
+                const idx = holdings.findIndex((h) => h.id === currentHolding.id);
+                return `${idx + 1} / ${holdings.length} · 左右滑動切換`;
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* ── Scrollable transaction list — 跟著 currentHolding ── */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
           <div className="text-xs text-muted-foreground mb-2 font-medium">
             交易紀錄 {transactions.length > 0 && `(${transactions.length})`}
@@ -171,11 +185,7 @@ export function HoldingDetailSheet({
           className="border-t bg-popover shrink-0 p-3"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          <Button
-            size="lg"
-            onClick={onAddDepositClick}
-            className="w-full gap-1.5"
-          >
+          <Button size="lg" onClick={onAddDepositClick} className="w-full gap-1.5">
             <Plus className="h-4 w-4 shrink-0" />
             <span className="truncate">新增一筆存款</span>
           </Button>
@@ -185,153 +195,73 @@ export function HoldingDetailSheet({
   );
 }
 
-const KIND_LABEL: Record<Transaction['kind'], string> = {
-  buy: '加買',
-  sell: '賣出',
-  monthly_dca: '月扣',
-  manual_adjust: '校正',
-  initial: '初始',
-};
-
-const KIND_COLOR: Record<Transaction['kind'], string> = {
-  buy: 'bg-up/10 text-up border-up/20',
-  monthly_dca: 'bg-up/10 text-up border-up/20',
-  sell: 'bg-down/10 text-down border-down/20',
-  manual_adjust: 'bg-muted text-muted-foreground border-border',
-  initial: 'bg-muted text-muted-foreground border-border',
-};
-
-function TransactionRow({
-  tx,
-  unitTag,
-  isUsdNative,
-  privacy,
-}: {
-  tx: Transaction;
-  unitTag: string;
-  isUsdNative: boolean;
-  privacy: boolean;
-}) {
-  const positive = tx.unitsDelta > 0 || tx.costDeltaTwd > 0;
-  const sign = tx.unitsDelta > 0 ? '+' : tx.unitsDelta < 0 ? '−' : '';
-  const costSign = tx.costDeltaTwd > 0 ? '+' : tx.costDeltaTwd < 0 ? '−' : '';
-
-  const date = new Date(tx.occurredAt);
-  const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
-  const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-
-  const showCostUsd =
-    isUsdNative && tx.costDeltaUsd != null && tx.costDeltaUsd !== 0;
-  const usdAbsStr = showCostUsd
-    ? `$ ${Math.abs(tx.costDeltaUsd!).toLocaleString('en-US', {
-        maximumFractionDigits: 2,
-      })}`
-    : '';
-
-  return (
-    <div className="rounded-md border border-border bg-card p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5">
-            <Badge
-              variant="outline"
-              className={cn(
-                'text-[10px] h-5 px-1.5 py-0 font-medium',
-                KIND_COLOR[tx.kind],
-              )}
-            >
-              {KIND_LABEL[tx.kind]}
-            </Badge>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {dateStr}
-            </span>
-            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-              {timeStr}
-            </span>
-          </div>
-          {tx.notes && (
-            <div className="text-[11px] text-muted-foreground mt-1">
-              {tx.notes}
-            </div>
-          )}
-        </div>
-        <div className="text-right shrink-0">
-          {tx.unitsDelta !== 0 && (
-            <div
-              className={cn(
-                'text-sm font-medium tabular-nums',
-                positive ? 'text-up' : 'text-down',
-              )}
-            >
-              {sign}
-              {formatUnits(Math.abs(tx.unitsDelta), unitsType(tx, isUsdNative))}{' '}
-              {unitTag}
-            </div>
-          )}
-          {tx.costDeltaTwd !== 0 && (
-            <div
-              className={cn(
-                'text-xs tabular-nums',
-                positive ? 'text-up' : 'text-down',
-              )}
-            >
-              {costSign}
-              {showCostUsd
-                ? maskMoney(usdAbsStr, privacy)
-                : maskMoney(formatTwd(Math.abs(tx.costDeltaTwd)), privacy)}
-            </div>
-          )}
-          {tx.pricePerUnitTwd != null && tx.pricePerUnitTwd > 0 && (
-            <div className="text-[10px] text-muted-foreground tabular-nums">
-              {formatPrice(tx.pricePerUnitTwd, 'TWD')} / {unitTag}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function unitsType(_tx: Transaction, isUsdNative: boolean): string {
-  // crypto 顯示 8 位,否則 5 位
-  return isUsdNative ? 'us_stock' : 'tw_stock';
+function unitTagFor(type: EnrichedHolding['type']): string {
+  if (type === 'crypto') return '顆';
+  if (type === 'tw_stock' || type === 'us_stock') return '股';
+  if (type === 'cash_usd') return 'USD';
+  return 'TWD';
 }
 
 /**
- * Detail header — 對齊國泰證券 app 單一持股版面:
- * 標題 → 股價/成交均價雙欄區塊 → 參考損益 / 參考現值 / 成本 / 總持股數 列表
+ * 單張 holding header 卡 — carousel 裡每個 snap 點。
+ * 對齊國泰證券 app 單一持股版面:標題 → 股價/成交均價雙欄 → 損益/現值/成本/持股數 列表。
  */
-function HoldingHeader({
+function HoldingHeaderCard({
   holding,
-  fxRate,
-  isUsdNative,
-  stockOrCrypto,
-  unitTag,
-  priceStr,
-  avgStr,
-  showAvg,
-  costStr,
-  pnlPositive,
+  usdTwd,
   privacy,
 }: {
   holding: EnrichedHolding;
-  fxRate: number;
-  isUsdNative: boolean;
-  stockOrCrypto: boolean;
-  unitTag: string;
-  priceStr: string;
-  avgStr: string;
-  showAvg: boolean;
-  costStr: string;
-  pnlPositive: boolean;
+  usdTwd: number | null | undefined;
   privacy: boolean;
 }) {
+  const fxRate = usdTwd ?? 0;
+  const isUsdNative = isUsdNativeType(holding.type);
+  const stockOrCrypto =
+    holding.type === 'tw_stock' ||
+    holding.type === 'us_stock' ||
+    holding.type === 'crypto';
   const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
+  const unitTag = unitTagFor(holding.type);
+
+  const costUsdView = isUsdNative
+    ? holding.costBasisUsd ??
+      (fxRate > 0 && holding.costBasisTwd > 0
+        ? holding.costBasisTwd / fxRate
+        : 0)
+    : 0;
+
+  const costStr = isUsdNative
+    ? formatUsd(costUsdView)
+    : formatTwd(holding.costBasisTwd, 'full');
+
+  // 成交均價:優先抄國泰原值,沒抄就 fallback cost ÷ units
+  const manualAvg = isUsdNative ? holding.avgPriceUsd : holding.avgPriceTwd;
+  const showAvg =
+    stockOrCrypto &&
+    (manualAvg !== undefined ||
+      (holding.units > 0 &&
+        (isUsdNative ? costUsdView > 0 : holding.costBasisTwd > 0)));
+  const avg = !showAvg
+    ? 0
+    : manualAvg !== undefined
+      ? manualAvg
+      : isUsdNative
+        ? costUsdView / holding.units
+        : holding.costBasisTwd / holding.units;
+  const avgStr = formatPrice(avg, isUsdNative ? 'USD' : 'TWD');
+
+  const priceStr = formatPriceForDisplay(
+    holding.currentPriceTwd,
+    isUsdNative,
+    fxRate,
+  );
+
+  const pnlPositive = holding.unrealizedPnlTwd >= 0;
   const showPnL = stockOrCrypto && holding.costBasisTwd > 0;
   const showMktValue =
     stockOrCrypto && holding.currentPriceTwd !== null && holding.units > 0;
 
-  // PnL / 現值 顯示用幣別(美股/加密 → USD,其他 → TWD)
   const pnlValue = isUsdNative
     ? fxRate > 0
       ? holding.unrealizedPnlTwd / fxRate
@@ -353,12 +283,12 @@ function HoldingHeader({
   const currencyTag = isUsdNative ? 'USD' : 'TWD';
 
   return (
-    <div className="px-4 pt-5 pb-4 border-b shrink-0">
+    <div className="rounded-2xl bg-card border border-border/60 px-4 py-4 shadow-sm">
       {/* 標題列 */}
       <div className="text-center pb-3">
-        <SheetTitle className="text-xl font-display">
+        <div className="text-xl font-display font-medium">
           {holding.displayName}
-        </SheetTitle>
+        </div>
         <div className="text-xs text-muted-foreground font-mono mt-1 flex items-center justify-center gap-1.5">
           <span>{holding.symbol}</span>
           {holding.hasPriceFallback && holding.type !== 'trust' && (
@@ -461,4 +391,117 @@ function DetailRow({
       <span>{value}</span>
     </div>
   );
+}
+
+const KIND_LABEL: Record<Transaction['kind'], string> = {
+  buy: '加買',
+  sell: '賣出',
+  monthly_dca: '月扣',
+  manual_adjust: '校正',
+  initial: '初始',
+};
+
+const KIND_COLOR: Record<Transaction['kind'], string> = {
+  buy: 'bg-up/10 text-up border-up/20',
+  monthly_dca: 'bg-up/10 text-up border-up/20',
+  sell: 'bg-down/10 text-down border-down/20',
+  manual_adjust: 'bg-muted text-muted-foreground border-border',
+  initial: 'bg-muted text-muted-foreground border-border',
+};
+
+function TransactionRow({
+  tx,
+  unitTag,
+  isUsdNative,
+  privacy,
+}: {
+  tx: Transaction;
+  unitTag: string;
+  isUsdNative: boolean;
+  privacy: boolean;
+}) {
+  const positive = tx.unitsDelta > 0 || tx.costDeltaTwd > 0;
+  const sign = tx.unitsDelta > 0 ? '+' : tx.unitsDelta < 0 ? '−' : '';
+  const costSign = tx.costDeltaTwd > 0 ? '+' : tx.costDeltaTwd < 0 ? '−' : '';
+
+  const date = new Date(tx.occurredAt);
+  const dateStr = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+  const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+
+  const showCostUsd =
+    isUsdNative && tx.costDeltaUsd != null && tx.costDeltaUsd !== 0;
+  const usdAbsStr = showCostUsd
+    ? `$ ${Math.abs(tx.costDeltaUsd!).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    : '';
+
+  return (
+    <div className="rounded-md border border-border bg-card p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-[10px] h-5 px-1.5 py-0 font-medium',
+                KIND_COLOR[tx.kind],
+              )}
+            >
+              {KIND_LABEL[tx.kind]}
+            </Badge>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {dateStr}
+            </span>
+            <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+              {timeStr}
+            </span>
+          </div>
+          {tx.notes && (
+            <div className="text-[11px] text-muted-foreground mt-1">
+              {tx.notes}
+            </div>
+          )}
+        </div>
+        <div className="text-right shrink-0">
+          {tx.unitsDelta !== 0 && (
+            <div
+              className={cn(
+                'text-sm font-medium tabular-nums',
+                positive ? 'text-up' : 'text-down',
+              )}
+            >
+              {sign}
+              {formatUnits(Math.abs(tx.unitsDelta), unitsType(tx, isUsdNative))}{' '}
+              {unitTag}
+            </div>
+          )}
+          {tx.costDeltaTwd !== 0 && (
+            <div
+              className={cn(
+                'text-xs tabular-nums',
+                positive ? 'text-up' : 'text-down',
+              )}
+            >
+              {costSign}
+              {showCostUsd
+                ? maskMoney(usdAbsStr, privacy)
+                : maskMoney(formatTwd(Math.abs(tx.costDeltaTwd)), privacy)}
+            </div>
+          )}
+          {tx.pricePerUnitTwd != null && tx.pricePerUnitTwd > 0 && (
+            <div className="text-[10px] text-muted-foreground tabular-nums">
+              {formatPrice(tx.pricePerUnitTwd, 'TWD')} / {unitTag}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function unitsType(_tx: Transaction, isUsdNative: boolean): string {
+  // crypto 顯示 8 位,否則 5 位
+  return isUsdNative ? 'us_stock' : 'tw_stock';
 }

@@ -81,6 +81,14 @@ function tabMatches(tab: TabValue, type: AssetType): boolean {
   return tab === type;
 }
 
+/** 同一個 tab 分類嗎 — detail carousel 把同類 holdings 串起來。 */
+function sameTabType(a: AssetType, b: AssetType): boolean {
+  if (a === b) return true;
+  const isCashA = a === 'cash_twd' || a === 'cash_usd';
+  const isCashB = b === 'cash_twd' || b === 'cash_usd';
+  return isCashA && isCashB;
+}
+
 export function Dashboard() {
   const holdingsQ = useHoldings();
   const pricesQ = usePrices();
@@ -414,10 +422,16 @@ export function Dashboard() {
         onConfirm={addHolding}
       />
       <HoldingDetailSheet
-        holding={detailTarget}
+        holdings={
+          detailTarget
+            ? enriched.filter((h) => sameTabType(detailTarget.type, h.type))
+            : []
+        }
+        currentId={detailId}
         open={!!detailTarget}
         usdTwd={pricesQ.data?.usdTwd}
         onClose={() => setDetailId(null)}
+        onChangeCurrentId={setDetailId}
         onAddDepositClick={() => {
           if (detailTarget) setBuyTarget(detailTarget);
         }}
