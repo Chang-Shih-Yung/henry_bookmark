@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { PricesResponse } from '@/lib/types';
 
 export const runtime = 'edge';
-export const revalidate = 60;
+export const revalidate = 15;
 
 const yahooSchema = z.object({
   chart: z.object({
@@ -37,7 +37,7 @@ type YahooQuote = { current: number; prev: number | null };
 async function fetchYahoo(symbol: string): Promise<YahooQuote> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
   const res = await fetch(url, {
-    next: { revalidate: 60 },
+    next: { revalidate: 15 },
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
@@ -63,7 +63,7 @@ type CryptoQuotes = {
 async function fetchCoingecko(): Promise<CryptoQuotes> {
   const url =
     'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,cardano,dogecoin&vs_currencies=twd&include_24hr_change=true';
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { next: { revalidate: 15 } });
   if (!res.ok) throw new Error(`coingecko HTTP ${res.status}`);
   const json = await res.json();
   const parsed = coingeckoSchema.parse(json);
@@ -84,7 +84,7 @@ async function fetchCoingecko(): Promise<CryptoQuotes> {
 
 async function fetchUsdTwd(): Promise<number> {
   const url = 'https://open.er-api.com/v6/latest/USD';
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { next: { revalidate: 15 } });
   if (!res.ok) throw new Error(`exchangerate HTTP ${res.status}`);
   const json = await res.json();
   const parsed = fxSchema.parse(json);
@@ -224,7 +224,7 @@ export async function GET() {
 
   return Response.json(body, {
     headers: {
-      'Cache-Control': 's-maxage=60, stale-while-revalidate=300',
+      'Cache-Control': 's-maxage=15, stale-while-revalidate=120',
     },
   });
 }

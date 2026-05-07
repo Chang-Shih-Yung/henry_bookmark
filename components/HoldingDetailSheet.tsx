@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Minus, AlertTriangle, Trash2, Repeat } from 'lucide-react';
+import { Plus, AlertTriangle, Trash2 } from 'lucide-react';
 import type { EnrichedHolding, Transaction } from '@/lib/types';
 import {
   formatTwd,
@@ -15,6 +15,7 @@ import {
   formatUnits,
   formatChange,
   formatPrice,
+  formatUsd,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
@@ -28,12 +29,8 @@ type Props = {
   open: boolean;
   usdTwd: number | null | undefined;
   onClose: () => void;
-  /** 額外買入(非定期定額)。 */
-  onAdHocBuyClick: () => void;
-  /** 額外賣出。 */
-  onSellClick: () => void;
-  /** 新增一筆定期定額(會帶 monthly 預填)。 */
-  onMonthlyDcaClick: () => void;
+  /** 新增一筆存款 — 輸入「買後累計總量、累計總額」,系統算這筆 delta。 */
+  onAddDepositClick: () => void;
   onDeleteClick: () => void;
 };
 
@@ -42,9 +39,7 @@ export function HoldingDetailSheet({
   open,
   usdTwd,
   onClose,
-  onAdHocBuyClick,
-  onSellClick,
-  onMonthlyDcaClick,
+  onAddDepositClick,
   onDeleteClick,
 }: Props) {
   const { privacy } = usePrivacy();
@@ -111,79 +106,20 @@ export function HoldingDetailSheet({
         className="rounded-t-2xl !h-[90vh] p-0 flex flex-col"
         initialFocus={false}
       >
-        {/* ── Header (sticky top) ── */}
-        <div className="px-4 pt-5 pb-3 border-b shrink-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <SheetTitle className="text-lg">
-                {holding.displayName}
-              </SheetTitle>
-              <div className="text-xs text-muted-foreground tabular-nums mt-0.5 flex items-center gap-1.5 flex-wrap">
-                <span className="font-mono">{holding.symbol}</span>
-                {holding.currentPriceTwd !== null && (
-                  <span>
-                    · 即時 {priceStr} / {unitTag}
-                  </span>
-                )}
-                {holding.hasPriceFallback && holding.type !== 'trust' && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] py-0 h-4 border-warning text-warning gap-0.5"
-                  >
-                    <AlertTriangle className="h-2.5 w-2.5" />
-                    估算
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Big total: 累積扣款 */}
-          <div className="mt-3">
-            <div className="text-xs text-muted-foreground">累積扣款</div>
-            <div className="text-3xl font-bold font-display tabular-nums tracking-tight mt-0.5">
-              {maskMoney(costStr, privacy)}
-            </div>
-            <div className="text-xs text-muted-foreground tabular-nums mt-1">
-              <span className="text-foreground font-medium">
-                {formatUnits(holding.units, holding.type)}
-              </span>{' '}
-              {unitTag}
-              {showAvg && (
-                <>
-                  {' · 成交均價 '}
-                  <span className="text-foreground">
-                    {avgStr} / {unitTag}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* PnL pair */}
-          {(hasTodayChange || holding.costBasisTwd > 0) && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              <PnLCell
-                label="今日"
-                pct={holding.todayChangePct}
-                twd={holding.todayChangeTwd}
-                positive={todayPositive}
-                disabled={!hasTodayChange}
-                privacy={privacy}
-              />
-              <PnLCell
-                label="自買進累計"
-                pct={
-                  holding.costBasisTwd > 0 ? holding.unrealizedPnlPct : null
-                }
-                twd={holding.unrealizedPnlTwd}
-                positive={pnlPositive}
-                disabled={holding.costBasisTwd === 0}
-                privacy={privacy}
-              />
-            </div>
-          )}
-        </div>
+        {/* ── Header (sticky top) — 對齊國泰 app 版面 ── */}
+        <HoldingHeader
+          holding={holding}
+          fxRate={fxRate}
+          isUsdNative={isUsdNative}
+          stockOrCrypto={stockOrCrypto}
+          unitTag={unitTag}
+          priceStr={priceStr}
+          avgStr={avgStr}
+          showAvg={showAvg}
+          costStr={costStr}
+          pnlPositive={pnlPositive}
+          privacy={privacy}
+        />
 
         {/* ── Scrollable transaction list ── */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -224,37 +160,18 @@ export function HoldingDetailSheet({
           </div>
         </div>
 
-        {/* ── Sticky bottom action bar(順序:額外買入 / 額外賣出 / 新增一筆定期定額)── */}
+        {/* ── Sticky bottom action bar — 單一「新增一筆存款」 ── */}
         <div
-          className="border-t bg-popover shrink-0 grid grid-cols-3 gap-2 p-3"
+          className="border-t bg-popover shrink-0 p-3"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
           <Button
-            variant="outline"
             size="lg"
-            onClick={onAdHocBuyClick}
-            className="gap-1.5 px-2"
+            onClick={onAddDepositClick}
+            className="w-full gap-1.5"
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span className="truncate">額外買入</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={onSellClick}
-            className="gap-1.5 px-2"
-            disabled={holding.units <= 0}
-          >
-            <Minus className="h-4 w-4 shrink-0" />
-            <span className="truncate">額外賣出</span>
-          </Button>
-          <Button
-            size="lg"
-            onClick={onMonthlyDcaClick}
-            className="gap-1.5 px-2"
-          >
-            <Repeat className="h-4 w-4 shrink-0" />
-            <span className="truncate">新增定期定額</span>
+            <span className="truncate">新增一筆存款</span>
           </Button>
         </div>
       </SheetContent>
@@ -374,46 +291,168 @@ function unitsType(_tx: Transaction, isUsdNative: boolean): string {
   return isUsdNative ? 'us_stock' : 'tw_stock';
 }
 
-function PnLCell({
-  label,
-  pct,
-  twd,
-  positive,
-  disabled,
+/**
+ * Detail header — 對齊國泰證券 app 單一持股版面:
+ * 標題 → 股價/成交均價雙欄區塊 → 參考損益 / 參考現值 / 成本 / 總持股數 列表
+ */
+function HoldingHeader({
+  holding,
+  fxRate,
+  isUsdNative,
+  stockOrCrypto,
+  unitTag,
+  priceStr,
+  avgStr,
+  showAvg,
+  costStr,
+  pnlPositive,
   privacy,
 }: {
-  label: string;
-  pct: number | null;
-  twd: number;
-  positive: boolean;
-  disabled: boolean;
+  holding: EnrichedHolding;
+  fxRate: number;
+  isUsdNative: boolean;
+  stockOrCrypto: boolean;
+  unitTag: string;
+  priceStr: string;
+  avgStr: string;
+  showAvg: boolean;
+  costStr: string;
+  pnlPositive: boolean;
   privacy: boolean;
 }) {
+  const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
+  const showPnL = stockOrCrypto && holding.costBasisTwd > 0;
+  const showMktValue =
+    stockOrCrypto && holding.currentPriceTwd !== null && holding.units > 0;
+
+  // PnL / 現值 顯示用幣別(美股/加密 → USD,其他 → TWD)
+  const pnlValue = isUsdNative
+    ? fxRate > 0
+      ? holding.unrealizedPnlTwd / fxRate
+      : 0
+    : holding.unrealizedPnlTwd;
+  const pnlStr = isUsdNative
+    ? `${pnlValue >= 0 ? '+' : '−'}${formatUsd(Math.abs(pnlValue))}`
+    : formatChange(holding.unrealizedPnlTwd);
+
+  const mktValue = isUsdNative
+    ? fxRate > 0
+      ? holding.marketValueTwd / fxRate
+      : 0
+    : holding.marketValueTwd;
+  const mktValueStr = isUsdNative
+    ? formatUsd(mktValue)
+    : formatTwd(holding.marketValueTwd, 'full');
+
+  const currencyTag = isUsdNative ? 'USD' : 'TWD';
+
   return (
-    <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
-      {disabled || pct === null ? (
-        <div className="text-sm text-muted-foreground tabular-nums mt-0.5">—</div>
-      ) : (
-        <>
-          <div
-            className={cn(
-              'text-sm font-medium tabular-nums mt-0.5',
-              positive ? 'text-up' : 'text-down',
-            )}
-          >
-            {positive ? '▲' : '▼'} {formatPct(pct)}
+    <div className="px-4 pt-5 pb-4 border-b shrink-0">
+      {/* 標題列 */}
+      <div className="text-center pb-3">
+        <SheetTitle className="text-xl font-display">
+          {holding.displayName}
+        </SheetTitle>
+        <div className="text-xs text-muted-foreground font-mono mt-1 flex items-center justify-center gap-1.5">
+          <span>{holding.symbol}</span>
+          {holding.hasPriceFallback && holding.type !== 'trust' && (
+            <Badge
+              variant="outline"
+              className="text-[10px] py-0 h-4 border-warning text-warning gap-0.5"
+            >
+              <AlertTriangle className="h-2.5 w-2.5" />
+              估算
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* 股價 / 成交均價 — 僅 stock/crypto */}
+      {stockOrCrypto && (
+        <div className="grid grid-cols-2 gap-2 py-3 mb-3 rounded-md bg-muted/40">
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground">
+              股價 ({currencyTag})
+            </div>
+            <div className="text-2xl font-bold font-display tabular-nums mt-1">
+              {holding.currentPriceTwd !== null ? priceStr : '—'}
+            </div>
           </div>
-          <div
-            className={cn(
-              'text-[11px] tabular-nums',
-              positive ? 'text-up' : 'text-down',
-            )}
-          >
-            {maskMoney(formatChange(twd), privacy)}
+          <div className="text-center border-l border-border/60">
+            <div className="text-xs text-muted-foreground">
+              成交均價 ({currencyTag})
+            </div>
+            <div className="text-2xl font-bold font-display tabular-nums mt-1">
+              {showAvg ? avgStr : '—'}
+            </div>
           </div>
-        </>
+        </div>
       )}
+
+      {/* 列表 — 國泰風格 */}
+      <div className="space-y-3">
+        {showPnL && (
+          <DetailRow
+            label="參考損益"
+            value={
+              <span
+                className={cn(
+                  'font-medium tabular-nums',
+                  pnlPositive ? 'text-up' : 'text-down',
+                )}
+              >
+                {maskMoney(pnlStr, privacy)}{' '}
+                <span className="text-sm">
+                  ({formatPct(holding.unrealizedPnlPct)})
+                </span>
+              </span>
+            }
+          />
+        )}
+        {showMktValue && (
+          <DetailRow
+            label="參考現值"
+            value={
+              <span className="text-2xl font-bold font-display tabular-nums">
+                {maskMoney(mktValueStr, privacy)}
+              </span>
+            }
+          />
+        )}
+        <DetailRow
+          label={isCash ? '餘額' : '成本'}
+          value={
+            <span className="font-medium tabular-nums">
+              {maskMoney(costStr, privacy)}
+            </span>
+          }
+        />
+        {!isCash && (
+          <DetailRow
+            label="總持股數"
+            value={
+              <span className="font-medium tabular-nums">
+                {formatUnits(holding.units, holding.type)} {unitTag}
+              </span>
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span>{value}</span>
     </div>
   );
 }

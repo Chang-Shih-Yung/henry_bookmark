@@ -12,115 +12,216 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Holding, TransactionKind } from '@/lib/types';
-import { applyBuy, applySell } from '@/lib/calc';
-import { formatTwd, formatUnits } from '@/lib/format';
+import type { Holding } from '@/lib/types';
+import { applyBuy } from '@/lib/calc';
+import { formatTwd, formatUnits, formatUsd } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 type BuyProps = {
   holding: Holding | null;
   open: boolean;
-  /** 'buy' = 額外買入(空表單);'monthly_dca' = 新增一筆定期定額(預填月扣金額)。 */
-  kind: TransactionKind;
+  /** USD↔TWD 即時匯率,用於把美股/加密的 USD 累計轉成 TWD 落地。 */
+  usdTwd: number | null | undefined;
   onClose: () => void;
   onConfirm: (next: Holding) => void;
 };
 
+/**
+ * 「新增一筆存款」對話框。
+ *
+ * 記帳 app 心智模型:Henry 從國泰 / 券商 app 抄「買完後的累計總量、累計總額」,
+ * 系統自動算這筆 delta 寫進 transactions。不分定期定額/額外加碼,通通是一筆「存款」。
+ *
+ * - 一般資產(stock / crypto / trust):兩欄(累計總量、累計總額)
+ * - 現金(cash_twd / cash_usd):一欄(累計餘額,單位即金額)
+ * - USD-native(us_stock / crypto / cash_usd):金額欄用 USD,後台用即時匯率換算 TWD 落地
+ */
 export function BuyDialog({
   holding,
   open,
-  kind,
+  usdTwd,
   onClose,
   onConfirm,
 }: BuyProps) {
   const [units, setUnits] = useState('');
   const [cost, setCost] = useState('');
 
-  const isMonthly = kind === 'monthly_dca';
-
   useEffect(() => {
     if (open && holding) {
       setUnits('');
-      if (isMonthly) {
-        const monthly = holding.monthlyAutoBuyTwd ?? 0;
-        setCost(monthly > 0 ? String(monthly) : '');
-      } else {
-        setCost('');
-      }
+      setCost('');
     }
-  }, [open, holding, isMonthly]);
+  }, [open, holding]);
 
   if (!holding) return null;
 
+  const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
+  const isUsdNative =
+    holding.type === 'us_stock' ||
+    holding.type === 'crypto' ||
+    holding.type === 'cash_usd';
+
+  const currentUnits = holding.units;
+  const currentCostTwd = holding.costBasisTwd;
+  const currentCostUsd = holding.costBasisUsd ?? 0;
+
+  // 現金:單欄(累計餘額),values 都用 cost 欄
+  // 非現金:雙欄(累計總量 + 累計總額)
+  const newTotalUnits = isCash ? Number(cost) : Number(units);
+  const newTotalCost = Number(cost);
+  const hasUnits = isCash ? cost !== '' && isFinite(newTotalUnits) : units !== '' && isFinite(newTotalUnits);
+  const hasCost = cost !== '' && isFinite(newTotalCost);
+
+  const addUnits = hasUnits ? newTotalUnits - currentUnits : 0;
+  const addCostUsd =
+    isUsdNative && hasCost ? newTotalCost - currentCostUsd : 0;
+  const addCostTwd = isUsdNative
+    ? addCostUsd * (usdTwd ?? 0)
+    : hasCost
+      ? newTotalCost - currentCostTwd
+      : 0;
+
+  const unitsError =
+    hasUnits && addUnits <= 0
+      ? addUnits === 0
+        ? '沒有變化'
+        : '需大於目前累計'
+      : null;
+  const costError = isUsdNative
+    ? hasCost && addCostUsd < 0
+      ? '需大於或等於目前累計'
+      : null
+    : hasCost && addCostTwd < 0
+      ? '需大於或等於目前累計'
+      : null;
+  const fxMissing = isUsdNative && !usdTwd;
+
+  // 現金:只有一欄(cost),unitsError 也來自 cost 變化
+  const canSubmit = isCash
+    ? hasCost && !unitsError && !fxMissing
+    : hasUnits && hasCost && !unitsError && !costError && !fxMissing;
+
   const handle = () => {
-    const u = Number(units);
-    const c = Number(cost);
-    if (!isFinite(u) || u <= 0 || !isFinite(c) || c < 0) return;
+    if (!canSubmit) return;
     try {
-      onConfirm(applyBuy(holding, u, c, undefined, kind));
+      if (isUsdNative) {
+        onConfirm(applyBuy(holding, addUnits, addCostTwd, addCostUsd, 'buy'));
+      } else {
+        onConfirm(applyBuy(holding, addUnits, addCostTwd, undefined, 'buy'));
+      }
       onClose();
     } catch (e) {
       console.error(e);
     }
   };
 
-  const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
-  const monthlyTwd = holding.monthlyAutoBuyTwd ?? 0;
-  const title = isMonthly ? '新增一筆定期定額' : '額外買入';
-  const description = isMonthly
-    ? '記錄這個月的定期定額扣款。金額已預填月扣,股數對著銀行 / 幣安抄。'
-    : '一次性的加買 / 加碼,跟定期定額分開記錄。';
+  const unitTag =
+    holding.type === 'crypto'
+      ? '顆'
+      : holding.type === 'tw_stock' || holding.type === 'us_stock'
+        ? '股'
+        : holding.type === 'cash_usd'
+          ? 'USD'
+          : 'TWD';
+
+  const currentUnitsStr = formatUnits(currentUnits, holding.type);
+  const currentCostStr = isUsdNative
+    ? formatUsd(currentCostUsd)
+    : formatTwd(currentCostTwd, 'full');
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {title} — {holding.displayName}
-          </DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle>新增一筆存款 — {holding.displayName}</DialogTitle>
+          <DialogDescription>
+            從 app 抄「買完後」的累計總量、累計總額。系統幫你算這筆 delta。
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div>
-            <Label htmlFor="buy-units">
-              {isCash ? '存入金額' : '本次加買數量'}
-              {holding.type === 'cash_usd' ? '(USD)' : ''}
-            </Label>
-            <Input
-              id="buy-units"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              value={units}
-              onChange={(e) => setUnits(e.target.value)}
-              placeholder={
-                holding.type === 'crypto'
-                  ? '例如 12.345'
-                  : holding.type === 'us_stock'
-                    ? '例如 0.298'
-                    : '例如 85'
-              }
-              className="text-base h-11"
-            />
-          </div>
+          {!isCash && (
+            <div>
+              <Label htmlFor="buy-units">買後累計總數量</Label>
+              <Input
+                id="buy-units"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={units}
+                onChange={(e) => setUnits(e.target.value)}
+                className="text-base h-11"
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                目前{' '}
+                <span className="font-medium tabular-nums">
+                  {currentUnitsStr}
+                </span>{' '}
+                {unitTag}
+                {hasUnits && !unitsError && addUnits > 0 && (
+                  <span className="text-up font-medium ml-2 tabular-nums">
+                    +{formatUnits(addUnits, holding.type)} {unitTag}
+                  </span>
+                )}
+                {unitsError && (
+                  <span className="text-destructive font-medium ml-2">
+                    · {unitsError}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
           <div>
             <Label htmlFor="buy-cost">
-              本次扣款金額(TWD,扣手續費後)
+              {isCash ? '存後累計餘額' : '買後累計總投入'}
+              {isUsdNative ? '(USD)' : '(TWD)'}
             </Label>
             <Input
               id="buy-cost"
               type="number"
-              inputMode="numeric"
+              inputMode="decimal"
               step="any"
               value={cost}
               onChange={(e) => setCost(e.target.value)}
               className="text-base h-11"
+              autoFocus={isCash}
             />
-            {isMonthly && monthlyTwd > 0 && (
-              <p className="text-xs text-muted-foreground mt-1.5">
-                已預填月扣 {formatTwd(monthlyTwd)}。實際扣款不同直接覆蓋。
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground mt-1.5">
+              目前{' '}
+              <span className="font-medium tabular-nums">
+                {currentCostStr}
+              </span>
+              {hasCost && !costError && !fxMissing && !(isCash && unitsError) && (
+                <span
+                  className={cn(
+                    'font-medium ml-2 tabular-nums',
+                    (isUsdNative ? addCostUsd : addCostTwd) > 0
+                      ? 'text-up'
+                      : 'text-muted-foreground',
+                  )}
+                >
+                  {isUsdNative
+                    ? `+${formatUsd(addCostUsd)}${
+                        usdTwd && !isCash
+                          ? ` ≈ ${formatTwd(addCostTwd, 'full')}`
+                          : ''
+                      }`
+                    : `+${formatTwd(addCostTwd, 'full')}`}
+                </span>
+              )}
+              {costError && (
+                <span className="text-destructive font-medium ml-2">
+                  · {costError}
+                </span>
+              )}
+              {fxMissing && (
+                <span className="text-destructive font-medium ml-2">
+                  · 等待匯率載入
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -128,99 +229,9 @@ export function BuyDialog({
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={handle} disabled={!Number(units) || !Number(cost)}>
+          <Button onClick={handle} disabled={!canSubmit}>
             確認
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-type SellProps = {
-  holding: Holding | null;
-  open: boolean;
-  onClose: () => void;
-  onConfirm: (next: Holding) => void;
-};
-
-export function SellDialog({ holding, open, onClose, onConfirm }: SellProps) {
-  const [units, setUnits] = useState('');
-  const [recv, setRecv] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setUnits('');
-      setRecv('');
-    }
-  }, [open]);
-
-  if (!holding) return null;
-
-  const handle = () => {
-    const u = Number(units);
-    const r = Number(recv);
-    if (!isFinite(u) || u < 0 || !isFinite(r) || r < 0) return;
-    try {
-      onConfirm(applySell(holding, u, r));
-      onClose();
-    } catch (e) {
-      console.error(e);
-      alert(e instanceof Error ? e.message : '賣出失敗');
-    }
-  };
-
-  const isCash = holding.type === 'cash_twd' || holding.type === 'cash_usd';
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>額外賣出 — {holding.displayName}</DialogTitle>
-          <DialogDescription>
-            目前持有 {formatUnits(holding.units, holding.type)} · 平均成本{' '}
-            {holding.units > 0
-              ? formatTwd(holding.costBasisTwd / holding.units, 'full')
-              : '—'}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-2">
-          <div>
-            <Label htmlFor="sell-units">
-              {isCash ? '提領金額' : '賣出數量'}
-              {holding.type === 'cash_usd' ? '(USD)' : ''}
-            </Label>
-            <Input
-              id="sell-units"
-              type="number"
-              inputMode="decimal"
-              step="any"
-              value={units}
-              onChange={(e) => setUnits(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div>
-            <Label htmlFor="sell-recv">
-              實收金額(TWD,扣手續費後)
-            </Label>
-            <Input
-              id="sell-recv"
-              type="number"
-              inputMode="numeric"
-              step="any"
-              value={recv}
-              onChange={(e) => setRecv(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={handle}>確認</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

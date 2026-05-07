@@ -11,8 +11,8 @@ export function usePrices() {
       if (!res.ok) throw new Error(`prices ${res.status}`);
       return res.json();
     },
-    staleTime: 60_000,
-    refetchInterval: 60_000,
+    staleTime: 20_000,
+    refetchInterval: 20_000,
     refetchOnWindowFocus: true,
   });
 }

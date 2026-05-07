@@ -33,9 +33,8 @@ import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { AllocationPie } from '@/components/AllocationPie';
 import { HoldingRow } from '@/components/HoldingRow';
 import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
-import { BuyDialog, SellDialog } from '@/components/BuySellDialogs';
+import { BuyDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
-import type { TransactionKind } from '@/lib/types';
 import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -88,14 +87,8 @@ export function Dashboard() {
   const updateMut = useUpdateHoldings();
   const { privacy, toggle: togglePrivacy } = usePrivacy();
 
-  const [buyTarget, setBuyTarget] = useState<{
-    holding: Holding;
-    kind: TransactionKind;
-  } | null>(null);
-  const [sellTarget, setSellTarget] = useState<Holding | null>(null);
-  const [detailTarget, setDetailTarget] = useState<EnrichedHolding | null>(
-    null,
-  );
+  const [buyTarget, setBuyTarget] = useState<Holding | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
   const [tab, setTab] = useState<TabValue>('all');
 
@@ -103,6 +96,12 @@ export function Dashboard() {
     if (!holdingsQ.data || !pricesQ.data) return [];
     return holdingsQ.data.items.map((h) => enrichHolding(h, pricesQ.data));
   }, [holdingsQ.data, pricesQ.data]);
+
+  // detailTarget 是 enriched 即時 derived,replaceHolding 後 enriched 重算 → detail 自動同步。
+  const detailTarget: EnrichedHolding | null = useMemo(
+    () => (detailId ? enriched.find((h) => h.id === detailId) ?? null : null),
+    [detailId, enriched],
+  );
 
   const summary = useMemo(
     () => computeSummary(enriched, defaultConfig.goalTwd),
@@ -375,7 +374,7 @@ export function Dashboard() {
                     key={h.id}
                     holding={h}
                     usdTwd={pricesQ.data?.usdTwd}
-                    onCardClick={() => setDetailTarget(h)}
+                    onCardClick={() => setDetailId(h.id)}
                   />
                 ))}
             </div>
@@ -398,16 +397,10 @@ export function Dashboard() {
 
       {/* Dialogs */}
       <BuyDialog
-        holding={buyTarget?.holding ?? null}
-        kind={buyTarget?.kind ?? 'buy'}
+        holding={buyTarget}
         open={!!buyTarget}
+        usdTwd={pricesQ.data?.usdTwd}
         onClose={() => setBuyTarget(null)}
-        onConfirm={(next) => replaceHolding(next.id, next)}
-      />
-      <SellDialog
-        holding={sellTarget}
-        open={!!sellTarget}
-        onClose={() => setSellTarget(null)}
         onConfirm={(next) => replaceHolding(next.id, next)}
       />
       <NewHoldingDialog
@@ -420,28 +413,13 @@ export function Dashboard() {
         holding={detailTarget}
         open={!!detailTarget}
         usdTwd={pricesQ.data?.usdTwd}
-        onClose={() => setDetailTarget(null)}
-        onAdHocBuyClick={() => {
-          if (detailTarget) {
-            setBuyTarget({ holding: detailTarget, kind: 'buy' });
-            setDetailTarget(null);
-          }
-        }}
-        onSellClick={() => {
-          if (detailTarget) {
-            setSellTarget(detailTarget);
-            setDetailTarget(null);
-          }
-        }}
-        onMonthlyDcaClick={() => {
-          if (detailTarget) {
-            setBuyTarget({ holding: detailTarget, kind: 'monthly_dca' });
-            setDetailTarget(null);
-          }
+        onClose={() => setDetailId(null)}
+        onAddDepositClick={() => {
+          if (detailTarget) setBuyTarget(detailTarget);
         }}
         onDeleteClick={() => {
           if (detailTarget && deleteHolding(detailTarget.id)) {
-            setDetailTarget(null);
+            setDetailId(null);
           }
         }}
       />
