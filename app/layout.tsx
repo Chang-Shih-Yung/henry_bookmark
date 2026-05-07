@@ -1,20 +1,23 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Space_Grotesk, JetBrains_Mono } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
-// Geist + Geist Mono — Vercel 出品,Stripe / Linear / Vercel 自家用,
-// 比 Inter 更現代俐落,Geist Mono 等寬數字對齊感極佳,專門給金額大字用。
-// 中文 fallback 到 PingFang TC(iOS 預裝最好的中文字)。
-const geistMono = Geist_Mono({
+// Space Grotesk + JetBrains Mono — 金融科技感最強的開源組合
+// Space Grotesk:幾何 grotesque,Stripe / Vercel analytics dashboard 風,大字超有科技感
+// JetBrains Mono:monospace,數字粗細對齊感極佳(原本給工程師看 code 用,金融數字也完美)
+// 中文 fallback PingFang TC(iOS 內建最好的中文字)
+const fontDisplay = JetBrains_Mono({
   variable: '--font-display',
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
 });
 
-const geist = Geist({
+const fontBody = Space_Grotesk({
   variable: '--font-body',
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
 });
 
 export const metadata: Metadata = {
@@ -37,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="zh-TW"
-      className={`dark ${geistMono.variable} ${geist.variable} h-full antialiased`}
+      className={`dark ${fontDisplay.variable} ${fontBody.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-body tabular-nums bg-background text-foreground">
         <Providers>{children}</Providers>

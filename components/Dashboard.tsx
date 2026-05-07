@@ -12,6 +12,8 @@ import {
   Bitcoin,
   Wallet,
   Landmark,
+  Hash,
+  TrendingUp,
   type LucideIcon,
 } from 'lucide-react';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
@@ -34,6 +36,7 @@ import { HoldingRow } from '@/components/HoldingRow';
 import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
 import { BuyDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
+import { AssetGrowthChart } from '@/components/AssetGrowthChart';
 import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -79,6 +82,7 @@ export function Dashboard() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
   const [tab, setTab] = useState<TabValue>('all');
+  const [heroView, setHeroView] = useState<'text' | 'chart'>('text');
 
   const enriched: EnrichedHolding[] = useMemo(() => {
     if (!holdingsQ.data || !pricesQ.data) return [];
@@ -168,55 +172,94 @@ export function Dashboard() {
         </h1>
       </header>
 
-      {/* Hero: total + progress */}
+      {/* Hero: total + progress(數字 / 圖表 兩種視圖) */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>目前總資產</span>
-          <button
-            type="button"
-            onClick={togglePrivacy}
-            className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent hover:text-foreground transition-colors"
-            aria-label={privacy ? '顯示金額' : '隱藏金額'}
-          >
-            {privacy ? (
-              <EyeOff className="h-3.5 w-3.5" />
-            ) : (
-              <Eye className="h-3.5 w-3.5" />
-            )}
-          </button>
-        </div>
-        <MoneyDisplay
-          twd={summary.totalAssetTwd}
-          hidden={privacy}
-          className="text-5xl font-bold font-display tracking-tight block text-foreground [text-shadow:0_0_32px_oklch(0.78_0.18_210/0.3)]"
-        />
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm tabular-nums">
-          <span
-            className={cn(
-              summary.totalCostBasisTwd === 0
-                ? 'text-muted-foreground'
-                : summary.totalUnrealizedPnlTwd >= 0
-                  ? 'text-up'
-                  : 'text-down',
-            )}
-          >
-            {summary.totalCostBasisTwd === 0
-              ? '尚未投入'
-              : `累計 ${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${maskMoney(formatTwd(summary.totalUnrealizedPnlTwd), privacy)})`}
-          </span>
-          {summary.totalTodayChangeTwd !== 0 && (
-            <span
-              className={cn(
-                'text-xs',
-                summary.totalTodayChangeTwd >= 0 ? 'text-up' : 'text-down',
-              )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>目前總資產</span>
+            <button
+              type="button"
+              onClick={togglePrivacy}
+              className="inline-flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent/30 hover:text-foreground transition-colors"
+              aria-label={privacy ? '顯示金額' : '隱藏金額'}
             >
-              今日 {summary.totalTodayChangeTwd >= 0 ? '▲' : '▼'}{' '}
-              {formatPct(summary.totalTodayChangePct)} (
-              {maskMoney(formatChange(summary.totalTodayChangeTwd), privacy)})
-            </span>
-          )}
+              {privacy ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+          {/* 文字 / 圖表 切換 */}
+          <div className="inline-flex rounded-full bg-card/40 backdrop-blur-sm border border-white/10 p-0.5">
+            <button
+              type="button"
+              onClick={() => setHeroView('text')}
+              className={cn(
+                'h-7 w-7 rounded-full inline-flex items-center justify-center transition-colors',
+                heroView === 'text'
+                  ? 'bg-accent-brand/25 text-accent-brand'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              aria-label="文字模式"
+            >
+              <Hash className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setHeroView('chart')}
+              className={cn(
+                'h-7 w-7 rounded-full inline-flex items-center justify-center transition-colors',
+                heroView === 'chart'
+                  ? 'bg-accent-brand/25 text-accent-brand'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+              aria-label="圖表模式"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
+
+        {heroView === 'text' ? (
+          <>
+            <MoneyDisplay
+              twd={summary.totalAssetTwd}
+              hidden={privacy}
+              className="text-5xl font-bold font-display tracking-tight block text-foreground [text-shadow:0_0_32px_oklch(0.78_0.18_210/0.3)]"
+            />
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm tabular-nums">
+              <span
+                className={cn(
+                  summary.totalCostBasisTwd === 0
+                    ? 'text-muted-foreground'
+                    : summary.totalUnrealizedPnlTwd >= 0
+                      ? 'text-up'
+                      : 'text-down',
+                )}
+              >
+                {summary.totalCostBasisTwd === 0
+                  ? '尚未投入'
+                  : `累計 ${summary.totalUnrealizedPnlTwd >= 0 ? '▲' : '▼'} ${formatPct(summary.totalUnrealizedPnlPct)} (${maskMoney(formatTwd(summary.totalUnrealizedPnlTwd), privacy)})`}
+              </span>
+              {summary.totalTodayChangeTwd !== 0 && (
+                <span
+                  className={cn(
+                    'text-xs',
+                    summary.totalTodayChangeTwd >= 0 ? 'text-up' : 'text-down',
+                  )}
+                >
+                  今日 {summary.totalTodayChangeTwd >= 0 ? '▲' : '▼'}{' '}
+                  {formatPct(summary.totalTodayChangePct)} (
+                  {maskMoney(formatChange(summary.totalTodayChangeTwd), privacy)})
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <AssetGrowthChart enriched={enriched} privacy={privacy} />
+        )}
+
         <Progress
           value={Math.min(summary.goalProgressPct * 100, 100)}
           className="h-2"
@@ -243,9 +286,12 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Sticky tab bar — 純文字 + 底線發光,不滿版,不上底色,沒數字 count */}
+      {/* Sticky tab bar — 鎖橫向 scroll(touch-action: pan-x),不滿版,不上底色,沒數字 count */}
       <div className="sticky top-0 z-10 py-3">
-        <div className="flex gap-6 overflow-x-auto scrollbar-none">
+        <div
+          className="flex gap-6 overflow-x-auto overflow-y-hidden scrollbar-none"
+          style={{ touchAction: 'pan-x' }}
+        >
           {TABS.map((t) => {
             const active = tab === t.value;
             return (
