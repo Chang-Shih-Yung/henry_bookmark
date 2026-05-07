@@ -1,19 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import { Space_Grotesk, IBM_Plex_Mono } from 'next/font/google';
+import { Space_Grotesk } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
-// Space Grotesk + IBM Plex Mono — 金融科技感最強的開源組合
-// Space Grotesk:幾何 grotesque,Stripe / Vercel analytics 風
-// IBM Plex Mono:IBM 設計系統字體,沒 slashed zero(0 中間沒斜線),專業金融感
-// 中文 fallback PingFang TC(iOS 內建最好的中文字)
-const fontDisplay = IBM_Plex_Mono({
-  variable: '--font-display',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-});
-
+// Body:Space Grotesk(幾何 grotesque,科技感)
+// Display(數字大字):用系統 mono `ui-monospace`,iOS / macOS 自動 fallback 到 SF Mono
+// — SF Mono 數字 0 純淨無斜線無中央點,Apple 自家用,品質最佳,還省 next/font 載入成本
 const fontBody = Space_Grotesk({
   variable: '--font-body',
   subsets: ['latin'],
@@ -46,7 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="zh-TW"
-      className={`dark ${fontDisplay.variable} ${fontBody.variable} h-full antialiased`}
+      className={`dark ${fontBody.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-body tabular-nums bg-background text-foreground">
         <Providers>{children}</Providers>

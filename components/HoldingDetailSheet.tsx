@@ -118,6 +118,9 @@ export function HoldingDetailSheet({
       shouldScaleBackground={false}
       // 控制拖動關閉的 threshold
       closeThreshold={0.25}
+      // 重要:modal=false 讓上層 Dialog(BuyDialog)的 input / button 可以正常接受事件
+      // (vaul 預設 modal=true 會把外部 inert,但 Dialog portal 也在外部會被誤鎖)
+      modal={false}
     >
       <DrawerContent className="!h-[90vh] p-0 flex flex-col gap-0 bg-popover border-t border-white/10">
         {/* DrawerTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}

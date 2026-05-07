@@ -62,6 +62,7 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
   const [units, setUnits] = useState('');
   const [cost, setCost] = useState('');
   const [auto, setAuto] = useState('');
+  const [avg, setAvg] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -70,18 +71,23 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
       setUnits('');
       setCost('');
       setAuto('');
+      setAvg('');
     }
   }, [open]);
 
   if (!type) return null;
   const def = TYPE_DEFAULTS[type];
+  const isUsdNative =
+    type === 'us_stock' || type === 'crypto' || type === 'cash_usd';
 
   const handle = () => {
     const u = Number(units || 0);
     const c = Number(cost || 0);
     const a = auto ? Number(auto) : undefined;
+    const avgNum = avg ? Number(avg) : undefined;
     if (!isFinite(u) || u < 0 || !isFinite(c) || c < 0) return;
     if (a !== undefined && (!isFinite(a) || a < 0)) return;
+    if (avgNum !== undefined && (!isFinite(avgNum) || avgNum <= 0)) return;
     if (!symbol || !name) return;
 
     const holding: Holding = {
@@ -92,6 +98,11 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
       units: u,
       costBasisTwd: c,
       monthlyAutoBuyTwd: a,
+      ...(avgNum !== undefined
+        ? isUsdNative
+          ? { avgPriceUsd: avgNum }
+          : { avgPriceTwd: avgNum }
+        : {}),
       updatedAt: new Date().toISOString(),
     };
     onConfirm(holding);
@@ -162,6 +173,27 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
               placeholder="例:5000"
             />
           </div>
+          {(type === 'tw_stock' || type === 'us_stock' || type === 'crypto') && (
+            <div>
+              <Label htmlFor="new-avg">
+                成交均價(從 app 抄,選填)
+                {isUsdNative ? '(USD)' : '(TWD)'}
+              </Label>
+              <Input
+                id="new-avg"
+                type="number"
+                inputMode="decimal"
+                step="any"
+                value={avg}
+                onChange={(e) => setAvg(e.target.value)}
+                placeholder="例:64.59"
+              />
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                國泰 / 券商 app 顯示的「成交均價」(不含手續費)。
+                空白 = 系統用「已投入 ÷ 數量」自動算(會比 app 多 ~0.5–1 元 / 股,因為含手續費)。
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
