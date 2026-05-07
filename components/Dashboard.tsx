@@ -358,7 +358,11 @@ export function Dashboard() {
           </section>
         </>
       ) : (
-        <section className="space-y-1">
+        <section className="space-y-3">
+          <TabSummary
+            items={enriched.filter((h) => tabMatches(tab, h.type))}
+            privacy={privacy}
+          />
           {enriched.filter((h) => tabMatches(tab, h.type)).length === 0 ? (
             <div className="text-center py-12 text-sm text-muted-foreground">
               這個分類還沒有資產。
@@ -478,6 +482,64 @@ function NewButtons({
     >
       <Plus className="h-3.5 w-3.5" /> 新增{labels[tab]}
     </Button>
+  );
+}
+
+/**
+ * 分類 tab 的小計 — 對齊國泰證券 app「敦南分公司 5705016」那層。
+ * 顯示:參考總現值 / 成本 / 參考損益(金額 + %)。
+ * 全幣別統一用 TWD canonical(跟全站總資產口徑一致)。
+ */
+function TabSummary({
+  items,
+  privacy,
+}: {
+  items: EnrichedHolding[];
+  privacy: boolean;
+}) {
+  if (items.length === 0) return null;
+  const total = items.reduce((sum, h) => sum + h.marketValueTwd, 0);
+  const cost = items.reduce((sum, h) => sum + h.costBasisTwd, 0);
+  const pnl = total - cost;
+  const pnlPct = cost > 0 ? pnl / cost : 0;
+  const positive = pnl >= 0;
+  const showPnL = cost > 0 && pnl !== 0;
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+      <div>
+        <div className="text-xs text-muted-foreground">參考總現值 (TWD)</div>
+        <div className="text-3xl font-bold font-display tabular-nums mt-1">
+          {maskMoney(formatTwd(total), privacy)}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 pt-3 border-t border-border/50">
+        <div>
+          <div className="text-xs text-muted-foreground">成本 (TWD)</div>
+          <div className="text-lg font-medium tabular-nums mt-0.5">
+            {maskMoney(formatTwd(cost), privacy)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">參考損益 (TWD)</div>
+          {showPnL ? (
+            <div
+              className={cn(
+                'text-lg font-medium tabular-nums mt-0.5',
+                positive ? 'text-up' : 'text-down',
+              )}
+            >
+              {maskMoney(formatChange(pnl), privacy)}{' '}
+              <span className="text-sm">({formatPct(pnlPct)})</span>
+            </div>
+          ) : (
+            <div className="text-lg text-muted-foreground tabular-nums mt-0.5">
+              —
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
