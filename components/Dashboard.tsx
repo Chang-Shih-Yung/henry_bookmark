@@ -35,6 +35,7 @@ import { MoneyDisplay } from '@/components/MoneyDisplay';
 import { AllocationPie } from '@/components/AllocationPie';
 import { HoldingRow } from '@/components/HoldingRow';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
+import { NewHoldingPicker } from '@/components/NewHoldingPicker';
 import { AssetGrowthChart } from '@/components/AssetGrowthChart';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
@@ -85,6 +86,7 @@ export function Dashboard() {
   const { privacy, toggle: togglePrivacy } = usePrivacy();
 
   const [newType, setNewType] = useState<AssetType | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [tab, setTab] = useState<TabValue>('all');
   const [heroView, setHeroView] = useState<'text' | 'chart'>('text');
 
@@ -384,7 +386,7 @@ export function Dashboard() {
         {filteredEnriched.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             {tab === 'all'
-              ? '還沒有任何資產 — 切換到下方分頁新增第一筆。'
+              ? '還沒有任何資產 — 點下方「+ 新增資產」開始第一筆。'
               : '這個分類還沒有資產。'}
           </div>
         ) : (
@@ -406,7 +408,18 @@ export function Dashboard() {
             </SortableContext>
           </DndContext>
         )}
-        {tab !== 'all' && (
+        {/* 「全部」分頁:單顆「+ 新增資產」按鈕 → 打開類別 picker;
+            其他特定分頁:直接顯示對應類別的新增按鈕(現金分頁雙顆 TWD/USD) */}
+        {tab === 'all' ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPickerOpen(true)}
+            className="w-full gap-1 mt-2"
+          >
+            <Plus className="h-3.5 w-3.5" /> 新增資產
+          </Button>
+        ) : (
           <NewButtons tab={tab} onNew={(type) => setNewType(type)} />
         )}
       </section>
@@ -442,6 +455,11 @@ export function Dashboard() {
       </footer>
 
       {/* Dialogs — 詳情編輯都搬到 /holding/[id] 子頁,首頁只剩新增 */}
+      <NewHoldingPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(type) => setNewType(type)}
+      />
       <NewHoldingDialog
         type={newType}
         open={!!newType}
