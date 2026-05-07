@@ -32,16 +32,6 @@ export default async function SettingsPage() {
 
         <section className="space-y-2">
           <h2 className="text-sm font-medium font-display text-muted-foreground">
-            資料
-          </h2>
-          <p className="text-xs text-muted-foreground rounded-lg border border-border bg-card p-4">
-            Holdings 自動存在 Upstash Redis,跨裝置同步。匯出 / 匯入功能待 v2
-            實作。
-          </p>
-        </section>
-
-        <section className="space-y-2">
-          <h2 className="text-sm font-medium font-display text-muted-foreground">
             提醒
           </h2>
           <PushReminderSettings />

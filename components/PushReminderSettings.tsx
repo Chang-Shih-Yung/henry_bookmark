@@ -14,6 +14,24 @@ import {
   unsubscribePush,
 } from '@/lib/notifications';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+function hourToHour12(h: number): number {
+  if (h === 0) return 12;
+  if (h <= 12) return h;
+  return h - 12;
+}
+
+function hour12ToHour(h12: number, isPM: boolean): number {
+  if (h12 === 12) return isPM ? 12 : 0;
+  return isPM ? h12 + 12 : h12;
+}
+
+function formatHour(h: number): string {
+  const isPM = h >= 12;
+  const h12 = hourToHour12(h);
+  return `${isPM ? '下午' : '上午'} ${h12}:00`;
+}
 
 export function PushReminderSettings() {
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -66,7 +84,7 @@ export function PushReminderSettings() {
         if (res.ok) {
           setEnabled(true);
           toast.success('已啟用月扣提醒', {
-            description: `每月 ${day} 號 ${String(hour).padStart(2, '0')}:00 會跳通知`,
+            description: `每月 ${day} 號 ${formatHour(hour)} 會跳通知`,
           });
         } else {
           toast.error('啟用失敗', { description: res.reason });
@@ -170,25 +188,62 @@ export function PushReminderSettings() {
             />
           </div>
           <div>
-            <Label
-              htmlFor="reminder-hour"
-              className="text-[11px] text-muted-foreground"
-            >
+            <Label className="text-[11px] text-muted-foreground">
               幾點(台灣時間)
             </Label>
-            <Input
-              id="reminder-hour"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={23}
-              value={hour}
-              onChange={(e) => {
-                setHour(Number(e.target.value));
-                setDirty(true);
-              }}
-              className="h-9 mt-1 text-base"
-            />
+            <div className="flex gap-1.5 mt-1">
+              {/* 上午 / 下午 segmented control */}
+              <div className="inline-flex rounded-md border border-white/10 bg-card/40 backdrop-blur-sm p-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const h12 = hourToHour12(hour);
+                    setHour(hour12ToHour(h12, false));
+                    setDirty(true);
+                  }}
+                  className={cn(
+                    'px-2 h-8 text-xs rounded transition-colors',
+                    hour < 12
+                      ? 'bg-accent-brand/20 text-accent-brand font-medium'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  上午
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const h12 = hourToHour12(hour);
+                    setHour(hour12ToHour(h12, true));
+                    setDirty(true);
+                  }}
+                  className={cn(
+                    'px-2 h-8 text-xs rounded transition-colors',
+                    hour >= 12
+                      ? 'bg-accent-brand/20 text-accent-brand font-medium'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  下午
+                </button>
+              </div>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={12}
+                value={hourToHour12(hour)}
+                onChange={(e) => {
+                  const h12 = Math.min(12, Math.max(1, Number(e.target.value) || 1));
+                  setHour(hour12ToHour(h12, hour >= 12));
+                  setDirty(true);
+                }}
+                className="h-9 text-base flex-1"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {formatHour(hour)}(24h:{String(hour).padStart(2, '0')}:00)
+            </p>
           </div>
         </div>
 

@@ -39,18 +39,35 @@ type Props = {
 export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
   const series = useMemo(() => buildSeries(enriched), [enriched]);
 
-  if (series.points.length < 2) {
+  // 沒任何交易 → 完全無資料
+  if (series.points.length === 0) {
     return (
       <div className="rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-6 text-center text-sm text-muted-foreground">
-        交易紀錄太少,還畫不出累計曲線。
-        <br />
-        多新增幾筆存款後就能看到資產走勢。
+        還沒有交易紀錄。新增第一筆存款後就會看到曲線。
       </div>
     );
   }
 
-  const labels = series.points.map((p) => p.label);
-  const values = series.points.map((p) => p.cumulativeCost);
+  // 只有一筆 → 補一個「上個月為 0」的虛擬起點,從 0 拉一條線到第一筆,圖表才有形狀
+  const augmented = series.points.length === 1
+    ? [
+        (() => {
+          const onlyLabel = series.points[0].label;
+          const [yy, mm] = onlyLabel.split('/').map(Number);
+          // 算前一個月 label
+          const prevYY = mm === 1 ? yy - 1 : yy;
+          const prevMM = mm === 1 ? 12 : mm - 1;
+          return {
+            label: `${String(prevYY).padStart(2, '0')}/${String(prevMM).padStart(2, '0')}`,
+            cumulativeCost: 0,
+          };
+        })(),
+        ...series.points,
+      ]
+    : series.points;
+
+  const labels = augmented.map((p) => p.label);
+  const values = augmented.map((p) => p.cumulativeCost);
   const lastIdx = values.length - 1;
   const positive = series.currentMarketValue >= series.totalCost;
 
