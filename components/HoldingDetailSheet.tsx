@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, AlertTriangle, Trash2, X } from 'lucide-react';
+import { Plus, AlertTriangle, Trash2 } from 'lucide-react';
 import type { EnrichedHolding, Transaction } from '@/lib/types';
 import {
   formatTwd,
@@ -77,15 +77,20 @@ export function HoldingDetailSheet({
     setDragOffset(0);
   };
 
-  // 開啟 / currentId 變動時,scroll 對應 card 進視野(沒動畫,跳過去就好)
+  // 開啟 / currentId 變動時,精準把對應 card 中心對齊容器中心
   useEffect(() => {
     if (!open || !currentId || !carouselRef.current) return;
-    const el = carouselRef.current.querySelector<HTMLElement>(
+    const carousel = carouselRef.current;
+    const card = carousel.querySelector<HTMLElement>(
       `[data-card-id="${CSS.escape(currentId)}"]`,
     );
-    if (el) {
-      el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'auto' });
-    }
+    if (!card) return;
+    // 等下一個 frame 確保布局完成
+    requestAnimationFrame(() => {
+      const targetLeft =
+        card.offsetLeft - (carousel.clientWidth - card.offsetWidth) / 2;
+      carousel.scrollTo({ left: targetLeft, behavior: 'auto' });
+    });
   }, [open, currentId]);
 
   // onScroll 偵測哪張卡距離容器中心最近 → debounce 後才通知 parent
@@ -131,12 +136,7 @@ export function HoldingDetailSheet({
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className={cn(
-          'rounded-t-3xl !h-[90vh] p-0 flex flex-col gap-0',
-          // 比預設 2.5rem 更大的 enter/exit 位移 — 從底部完整滑上滑下
-          'data-[side=bottom]:!data-starting-style:translate-y-full data-[side=bottom]:!data-ending-style:translate-y-full',
-          '!duration-300 ease-out',
-        )}
+        className="rounded-t-3xl !h-[90vh] p-0 flex flex-col gap-0"
         style={{
           transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
           // 拖動中:no transition,跟手指走;放開時:iOS spring curve bounce 回原位
@@ -151,7 +151,7 @@ export function HoldingDetailSheet({
 
         {/* ── Top bar:drag handle + 標題 + 關閉 ── */}
         <div className="shrink-0">
-          {/* drag handle 觸發區 — 拉大到 44px 滿足 touch target,實際視覺只是中央那條 lozenge */}
+          {/* drag handle 觸發區 — 44px touch target,視覺只是中央 lozenge,純素淨不發光 */}
           <div
             onTouchStart={onHandleTouchStart}
             onTouchMove={onHandleTouchMove}
@@ -161,25 +161,13 @@ export function HoldingDetailSheet({
             style={{ touchAction: 'none' }}
             aria-label="向下拖動關閉"
           >
-            <div className="h-1.5 w-12 rounded-full bg-foreground/25 shadow-[0_0_8px_oklch(0.78_0.18_210/0.3)]" />
+            <div className="h-1.5 w-12 rounded-full bg-foreground/25" />
           </div>
 
-          {/* 標題列 — 對齊國泰「單一持股資訊 / 所有庫存」 + 右上「關閉」 */}
-          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-4 pb-2">
-            <div className="w-12" /> {/* 左側佔位平衡右側按鈕 */}
-            <div className="text-center">
-              <div className="text-sm font-medium">單一持股資訊</div>
-              <div className="text-[11px] text-muted-foreground">所有庫存</div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 px-2 text-muted-foreground hover:text-foreground -mr-2"
-              aria-label="關閉"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+          {/* 標題列 — 國泰風格「單一持股資訊 / 所有庫存」(不再有 X close,拖動 bar 是唯一關閉路徑) */}
+          <div className="text-center pb-2">
+            <div className="text-sm font-medium">單一持股資訊</div>
+            <div className="text-[11px] text-muted-foreground">所有庫存</div>
           </div>
         </div>
 
@@ -330,13 +318,25 @@ function HoldingHeaderCard({
       : isUsdNative
         ? costUsdView / holding.units
         : holding.costBasisTwd / holding.units;
-  const avgStr = formatPrice(avg, isUsdNative ? 'USD' : 'TWD');
+  // 只顯示數字(label 已標 TWD/USD,不再前綴 NT$ / $)
+  const numFmtOptions = {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  };
+  const avgStr = showAvg ? avg.toLocaleString('en-US', numFmtOptions) : '—';
 
-  const priceStr = formatPriceForDisplay(
-    holding.currentPriceTwd,
-    isUsdNative,
-    fxRate,
-  );
+  const priceVal =
+    holding.currentPriceTwd === null
+      ? null
+      : isUsdNative && fxRate > 0
+        ? holding.currentPriceTwd / fxRate
+        : holding.currentPriceTwd;
+  const priceStr =
+    priceVal === null ? '—' : priceVal.toLocaleString('en-US', numFmtOptions);
+
+  // 保留原始 formatted 版(含 NT$ / $)給其他地方用
+  void formatPrice;
+  void formatPriceForDisplay;
 
   const pnlPositive = holding.unrealizedPnlTwd >= 0;
   const showPnL = stockOrCrypto && holding.costBasisTwd > 0;
@@ -396,23 +396,23 @@ function HoldingHeaderCard({
         </div>
       </div>
 
-      {/* 股價 / 成交均價 — 僅 stock/crypto */}
+      {/* 股價 / 成交均價 — 僅 stock/crypto;字體 text-lg 不跳行,純數字不重複前綴 */}
       {stockOrCrypto && (
-        <div className="relative grid grid-cols-2 gap-2 py-3 mb-3 rounded-lg bg-background/30 backdrop-blur-sm border border-white/5">
-          <div className="text-center">
-            <div className="text-xs text-muted-foreground">
+        <div className="relative grid grid-cols-2 py-3 mb-3 rounded-lg bg-background/30 backdrop-blur-sm border border-white/5">
+          <div className="text-center px-2">
+            <div className="text-[11px] text-muted-foreground">
               股價 ({currencyTag})
             </div>
-            <div className="text-2xl font-bold font-display tabular-nums mt-1">
-              {holding.currentPriceTwd !== null ? priceStr : '—'}
+            <div className="text-lg font-semibold font-display tabular-nums mt-1">
+              {priceStr}
             </div>
           </div>
-          <div className="text-center border-l border-border/60">
-            <div className="text-xs text-muted-foreground">
+          <div className="text-center border-l border-white/10 px-2">
+            <div className="text-[11px] text-muted-foreground">
               成交均價 ({currencyTag})
             </div>
-            <div className="text-2xl font-bold font-display tabular-nums mt-1">
-              {showAvg ? avgStr : '—'}
+            <div className="text-lg font-semibold font-display tabular-nums mt-1">
+              {avgStr}
             </div>
           </div>
         </div>

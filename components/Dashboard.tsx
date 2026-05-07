@@ -263,8 +263,8 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* Sticky tab bar — 文字 + 底線 + 發光,參考截圖三 today/week/month/year 風格 */}
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-background/60 backdrop-blur-md">
+      {/* Sticky tab bar — 文字 + 底線 + 發光;整塊不上底色,讓 ambient 漸層直接透過 */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-3">
         <div className="flex gap-6 overflow-x-auto scrollbar-none">
           {TABS.map((t) => {
             const count =
