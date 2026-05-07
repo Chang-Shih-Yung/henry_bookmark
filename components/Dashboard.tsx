@@ -101,6 +101,12 @@ export function Dashboard() {
     [enriched],
   );
 
+  // 當前 tab 過濾後的 holdings — 集中 useMemo,避免 render 中 .filter 跑三次
+  const filteredEnriched = useMemo(
+    () => enriched.filter((h) => tabMatches(tab, h.type)),
+    [enriched, tab],
+  );
+
   const remainingToGoal = Math.max(
     defaultConfig.goalTwd - summary.totalAssetTwd,
     0,
@@ -322,11 +328,8 @@ export function Dashboard() {
             <AllocationPie summary={summary} />
           </div>
         )}
-        <TabSummary
-          items={enriched.filter((h) => tabMatches(tab, h.type))}
-          privacy={privacy}
-        />
-        {enriched.filter((h) => tabMatches(tab, h.type)).length === 0 ? (
+        <TabSummary items={filteredEnriched} privacy={privacy} />
+        {filteredEnriched.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             {tab === 'all'
               ? '還沒有任何資產 — 切換到下方分頁新增第一筆。'
@@ -334,16 +337,14 @@ export function Dashboard() {
           </div>
         ) : (
           <div className="space-y-2">
-            {enriched
-              .filter((h) => tabMatches(tab, h.type))
-              .map((h) => (
-                <HoldingRow
-                  key={h.id}
-                  holding={h}
-                  usdTwd={pricesQ.data?.usdTwd}
-                  onCardClick={() => setDetailId(h.id)}
-                />
-              ))}
+            {filteredEnriched.map((h) => (
+              <HoldingRow
+                key={h.id}
+                holding={h}
+                usdTwd={pricesQ.data?.usdTwd}
+                onCardClick={() => setDetailId(h.id)}
+              />
+            ))}
           </div>
         )}
         {tab !== 'all' && (
