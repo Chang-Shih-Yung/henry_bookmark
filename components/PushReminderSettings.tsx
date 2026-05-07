@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell, BellOff, Loader2 } from 'lucide-react';
+import { Bell, BellOff, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldLabel } from '@/components/ui/field-label';
@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   type Device,
+  deleteDevice,
   fetchDevices,
   fetchReminderConfig,
   forceResubscribe,
@@ -287,11 +288,39 @@ export function PushReminderSettings() {
             </span>
           </div>
           {devices.length > 0 && (
-            <div className="mt-1.5 pl-3 space-y-0.5">
+            <div className="mt-1.5 pl-3 space-y-1">
               {devices.map((d, i) => (
-                <div key={d.hash || i} className="text-muted-foreground/80">
-                  {i + 1}. {d.provider}{' '}
-                  <span className="text-muted-foreground/50">…{d.hash}</span>
+                <div
+                  key={d.hash || i}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="text-muted-foreground/80 truncate">
+                    {i + 1}. {d.provider}{' '}
+                    <span className="text-muted-foreground/50">
+                      …{d.hash}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`刪除這台 ${d.provider} 裝置的訂閱?`))
+                        return;
+                      setBusy(true);
+                      const res = await deleteDevice(d.endpoint);
+                      if (res.ok) {
+                        toast.success('已刪除該裝置訂閱');
+                        await refreshDevices();
+                      } else {
+                        toast.error('刪除失敗');
+                      }
+                      setBusy(false);
+                    }}
+                    disabled={busy}
+                    aria-label="刪除這台裝置"
+                    className="shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
                 </div>
               ))}
             </div>

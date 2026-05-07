@@ -169,7 +169,12 @@ export async function fetchReminderConfig(): Promise<{
   return res.json();
 }
 
-export type Device = { provider: string; host: string; hash: string };
+export type Device = {
+  provider: string;
+  host: string;
+  hash: string;
+  endpoint: string;
+};
 export async function fetchDevices(): Promise<Device[]> {
   try {
     const res = await fetch('/api/push/devices');
@@ -179,6 +184,15 @@ export async function fetchDevices(): Promise<Device[]> {
   } catch {
     return [];
   }
+}
+
+/** 刪除單一裝置(按 endpoint 找)— 用 user 設定頁的 × 按鈕 */
+export async function deleteDevice(endpoint: string): Promise<{ ok: boolean }> {
+  const res = await fetch(
+    `/api/push/subscribe?endpoint=${encodeURIComponent(endpoint)}`,
+    { method: 'DELETE' },
+  );
+  return { ok: res.ok };
 }
 
 export async function sendTestPush(): Promise<{

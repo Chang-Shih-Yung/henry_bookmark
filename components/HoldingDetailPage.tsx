@@ -213,27 +213,28 @@ export function HoldingDetailPage({ id }: Props) {
       className="mx-auto w-full max-w-2xl pb-32 flex flex-col min-h-dvh"
       style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))' }}
     >
-      {/* iOS-style nav header:返回箭頭 + 標題同一行,標題置中 */}
-      <header className="relative h-12 flex items-center justify-center px-2">
+      {/* iOS-style nav header:返回箭頭 + 標題同一行,標題置中
+          標題依 holding 分類動態變(台股 / 美股 / 加密貨幣 / 現金 / 信託) */}
+      <header className="relative h-14 flex items-center justify-center px-2">
         <button
           type="button"
-          onClick={() => router.push('/')}
+          onClick={goBack}
           aria-label="返回"
           className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-accent/30 active:bg-accent/50 transition-colors"
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
         <div className="text-center">
-          <div className="text-sm font-medium leading-tight">單一持股資訊</div>
-          <div className="text-[11px] text-muted-foreground leading-tight">
+          <div className="text-sm font-medium leading-tight">
+            {categoryLabel(currentHolding.type)}
+          </div>
+          <div className="text-[11px] text-muted-foreground leading-tight mt-1">
             所有庫存
           </div>
         </div>
       </header>
 
-      {/* Carousel header — w-[80%] 之前 parent px-[10%] 把實際寬度壓成 64%
-          (% width 用 parent content-box,padding 吃掉 20% 後 80% × 80% = 64%)
-          改用左右 spacer 提供 scroll-padding 效果,卡牌 w-[80%] 才是真正 80% viewport */}
+      {/* Carousel header — 卡牌 w-[86%] 真實 viewport 寬度 */}
       <div
         ref={carouselRef}
         onScroll={handleCarouselScroll}
@@ -241,12 +242,12 @@ export function HoldingDetailPage({ id }: Props) {
         style={{ scrollSnapType: 'x mandatory' }}
       >
         <div className="flex gap-3 py-4">
-          <div className="shrink-0 w-[8%]" aria-hidden />
+          <div className="shrink-0 w-[7%]" aria-hidden />
           {siblings.map((h) => (
             <div
               key={h.id}
               data-card-id={h.id}
-              className="snap-center shrink-0 w-[84%]"
+              className="snap-center shrink-0 w-[86%]"
             >
               <HoldingHeaderCard
                 holding={h}
@@ -256,7 +257,7 @@ export function HoldingDetailPage({ id }: Props) {
               />
             </div>
           ))}
-          <div className="shrink-0 w-[8%]" aria-hidden />
+          <div className="shrink-0 w-[7%]" aria-hidden />
         </div>
         {siblings.length > 1 && (
           <div className="text-[10px] text-muted-foreground/70 text-center pb-2 tabular-nums">
@@ -266,7 +267,7 @@ export function HoldingDetailPage({ id }: Props) {
         )}
       </div>
 
-      {/* Transactions */}
+      {/* Transactions — 中段不再放刪除按鈕(移到底部 sticky bar 跟新增並排)*/}
       <div className="flex-1 px-4 py-3">
         <div className="text-xs text-muted-foreground mb-2 font-medium">
           交易紀錄 {transactions.length > 0 && `(${transactions.length})`}
@@ -290,33 +291,30 @@ export function HoldingDetailPage({ id }: Props) {
             ))}
           </div>
         )}
-
-        <div className="pt-6 pb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={deleteCurrent}
-            className="w-full text-destructive hover:text-destructive hover:bg-destructive/5 gap-1.5"
-          >
-            <Trash2 className="h-4 w-4" />
-            刪除這筆資產
-          </Button>
-        </div>
       </div>
 
-      {/* Sticky bottom action bar */}
+      {/* Sticky bottom action bar:刪除資產 + 新增存款 並排 */}
       <div
         className="fixed bottom-0 inset-x-0 border-t border-white/10 bg-popover/85 backdrop-blur-xl p-3 z-30"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        <div className="mx-auto max-w-2xl">
+        <div className="mx-auto max-w-2xl grid grid-cols-[auto_1fr] gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={deleteCurrent}
+            className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive gap-1.5 px-4"
+          >
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span>刪除資產</span>
+          </Button>
           <Button
             size="lg"
             onClick={() => setBuyTarget(currentHolding)}
-            className="w-full gap-1.5"
+            className="gap-1.5"
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span className="truncate">新增一筆存款</span>
+            <span>新增存款</span>
           </Button>
         </div>
       </div>
@@ -344,6 +342,25 @@ function unitTagFor(type: EnrichedHolding['type']): string {
   if (type === 'tw_stock' || type === 'us_stock') return '股';
   if (type === 'cash_usd') return 'USD';
   return 'TWD';
+}
+
+/** 依 holding type 對應分類標題 — 取代寫死的「單一持股資訊」 */
+function categoryLabel(type: EnrichedHolding['type']): string {
+  switch (type) {
+    case 'tw_stock':
+      return '台股';
+    case 'us_stock':
+      return '美股';
+    case 'crypto':
+      return '加密貨幣';
+    case 'cash_twd':
+    case 'cash_usd':
+      return '現金';
+    case 'trust':
+      return '信託';
+    default:
+      return '資產';
+  }
 }
 
 function HoldingHeaderCard({
@@ -501,12 +518,12 @@ function HoldingHeaderCard({
             value={
               <span
                 className={cn(
-                  'font-medium tabular-nums',
+                  'font-medium tabular-nums whitespace-nowrap',
                   pnlPositive ? 'text-up' : 'text-down',
                 )}
               >
-                {maskMoney(pnlStr, privacy)}{' '}
-                <span className="text-sm">
+                {maskMoney(pnlStr, privacy)}
+                <span className="text-xs ml-1 opacity-80">
                   ({formatPct(holding.unrealizedPnlPct)})
                 </span>
               </span>

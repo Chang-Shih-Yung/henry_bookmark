@@ -27,15 +27,15 @@ export async function GET() {
     .map((s) => {
       try {
         const url = new URL(s.endpoint);
-        // 取 endpoint 末段當識別:同一裝置每次 endpoint 一樣
-        const hash = s.endpoint.slice(-12);
         return {
           provider: hostToProvider(url.host),
           host: url.host,
-          hash,
+          hash: s.endpoint.slice(-12),
+          // endpoint 拿來給 DELETE 用 — 是 user 自己的 sub,曝露給自己 OK
+          endpoint: s.endpoint,
         };
       } catch {
-        return { provider: 'unknown', host: '', hash: '' };
+        return { provider: 'unknown', host: '', hash: '', endpoint: '' };
       }
     });
 
