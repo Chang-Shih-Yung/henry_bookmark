@@ -299,68 +299,8 @@ export function Dashboard() {
           value={Math.min(summary.goalProgressPct * 100, 100)}
           className="h-2"
         />
-        {/* 達成 / 還差移到 /simulate 頁。這裡改放「成本 / 參考損益」橫排 —
-            從原本 TabSummary 卡牌搬上來,當前 tab 過濾後的數字。 */}
-        {filteredEnriched.length > 0 && (
-          <div
-            key={`hero-cost-pnl-${privacy ? 'm' : 's'}`}
-            className="grid grid-cols-2 gap-3 pt-1"
-          >
-            <div>
-              <div className="text-[11px] text-muted-foreground">
-                成本 (TWD)
-              </div>
-              <div className="text-base font-medium tabular-nums mt-0.5">
-                {privacy
-                  ? '••••'
-                  : formatTwd(
-                      filteredEnriched.reduce(
-                        (s, h) => s + h.costBasisTwd,
-                        0,
-                      ),
-                    )}
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] text-muted-foreground">
-                參考損益 (TWD)
-              </div>
-              {(() => {
-                const total = filteredEnriched.reduce(
-                  (s, h) => s + h.marketValueTwd,
-                  0,
-                );
-                const cost = filteredEnriched.reduce(
-                  (s, h) => s + h.costBasisTwd,
-                  0,
-                );
-                const pnl = total - cost;
-                const pnlPct = cost > 0 ? pnl / cost : 0;
-                const showPnl = cost > 0 && pnl !== 0;
-                if (!showPnl) {
-                  return (
-                    <div className="text-base text-muted-foreground tabular-nums mt-0.5">
-                      —
-                    </div>
-                  );
-                }
-                return (
-                  <div
-                    className={cn(
-                      'text-base font-medium tabular-nums mt-0.5 whitespace-nowrap',
-                      pnl >= 0 ? 'text-up' : 'text-down',
-                    )}
-                  >
-                    {privacy ? '••••' : formatChange(pnl)}
-                    <span className="text-xs ml-1 opacity-80">
-                      ({formatPct(pnlPct)})
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        )}
+        {/* 達成 / 還差 搬到 /simulate 頁,hero 不再顯示。
+            參考總現值 / 成本 / 損益 仍在下方 TabSummary 卡牌(per-tab 切分類)。 */}
       </section>
 
       {/* Price source warning */}
@@ -417,6 +357,7 @@ export function Dashboard() {
             <AllocationPie summary={summary} privacy={privacy} />
           </div>
         )}
+        <TabSummary items={filteredEnriched} privacy={privacy} />
         {filteredEnriched.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             {tab === 'all'
@@ -555,6 +496,76 @@ function NewButtons({
     >
       <Plus className="h-3.5 w-3.5" /> 新增{labels[tab]}
     </Button>
+  );
+}
+
+/**
+ * 分類 tab 的小計 — 顯示參考總現值 / 成本 / 參考損益(金額 + %)。
+ * items 由 Dashboard 用 filteredEnriched 傳進來,所以切到台股 tab 會顯示
+ * 台股 only 的數字,跟全站總資產(hero)區隔。
+ */
+function TabSummary({
+  items,
+  privacy,
+}: {
+  items: EnrichedHolding[];
+  privacy: boolean;
+}) {
+  if (items.length === 0) return null;
+  const total = items.reduce((sum, h) => sum + h.marketValueTwd, 0);
+  const cost = items.reduce((sum, h) => sum + h.costBasisTwd, 0);
+  const pnl = total - cost;
+  const pnlPct = cost > 0 ? pnl / cost : 0;
+  const positive = pnl >= 0;
+  const showPnL = cost > 0 && pnl !== 0;
+
+  return (
+    <div
+      key={`tab-summary-${privacy ? 'm' : 's'}`}
+      className={cn(
+        'relative overflow-hidden rounded-2xl p-4 space-y-3',
+        'bg-card/40 backdrop-blur-xl',
+        'border border-white/10',
+        'shadow-[0_4px_24px_rgba(0,0,0,0.25)]',
+      )}
+    >
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
+      />
+      <div className="relative">
+        <div className="text-xs text-muted-foreground">參考總現值 (TWD)</div>
+        <div className="text-3xl font-bold font-display tabular-nums mt-1">
+          {privacy ? '••••' : formatTwd(total)}
+        </div>
+      </div>
+      <div className="relative grid grid-cols-2 gap-3 pt-3 border-t border-white/8">
+        <div>
+          <div className="text-xs text-muted-foreground">成本 (TWD)</div>
+          <div className="text-lg font-medium tabular-nums mt-0.5">
+            {privacy ? '••••' : formatTwd(cost)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground">參考損益 (TWD)</div>
+          {showPnL ? (
+            <div
+              className={cn(
+                'text-lg font-medium tabular-nums mt-0.5',
+                positive ? 'text-up' : 'text-down',
+              )}
+            >
+              {privacy ? '••••' : formatChange(pnl)}{' '}
+              <span className="text-sm">({formatPct(pnlPct)})</span>
+            </div>
+          ) : (
+            <div className="text-lg text-muted-foreground tabular-nums mt-0.5">
+              —
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
