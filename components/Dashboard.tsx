@@ -208,7 +208,7 @@ export function Dashboard() {
         <MoneyDisplay
           twd={summary.totalAssetTwd}
           hidden={privacy}
-          className="text-5xl font-bold font-display tracking-tight block text-foreground"
+          className="text-5xl font-bold font-display tracking-tight block text-foreground [text-shadow:0_0_32px_oklch(0.78_0.18_210/0.3)]"
         />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm tabular-nums">
           <span
@@ -349,7 +349,7 @@ export function Dashboard() {
                     )}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-muted inline-flex items-center justify-center text-muted-foreground">
+                      <div className="h-9 w-9 rounded-full bg-background/40 backdrop-blur-sm border border-white/10 inline-flex items-center justify-center text-foreground/80 shadow-inner">
                         <s.Icon className="h-4 w-4" />
                       </div>
                       <div>

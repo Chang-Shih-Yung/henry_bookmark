@@ -88,28 +88,33 @@ export function HoldingDetailSheet({
     }
   }, [open, currentId]);
 
-  // onScroll 偵測哪張卡距離容器中心最近 → 通知 parent 切 currentId
+  // onScroll 偵測哪張卡距離容器中心最近 → debounce 後才通知 parent
+  // 不 debounce 的話 scroll 進行中會狂閃 transactions list
+  const scrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleCarouselScroll = useCallback(() => {
-    const el = carouselRef.current;
-    if (!el) return;
-    const cards = el.querySelectorAll<HTMLElement>('[data-card-id]');
-    if (cards.length === 0) return;
-    const containerRect = el.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
-    let bestId: string | null = null;
-    let bestDist = Infinity;
-    cards.forEach((card) => {
-      const rect = card.getBoundingClientRect();
-      const cardCenter = rect.left + rect.width / 2;
-      const dist = Math.abs(cardCenter - containerCenter);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestId = card.dataset.cardId ?? null;
+    if (scrollDebounceRef.current) clearTimeout(scrollDebounceRef.current);
+    scrollDebounceRef.current = setTimeout(() => {
+      const el = carouselRef.current;
+      if (!el) return;
+      const cards = el.querySelectorAll<HTMLElement>('[data-card-id]');
+      if (cards.length === 0) return;
+      const containerRect = el.getBoundingClientRect();
+      const containerCenter = containerRect.left + containerRect.width / 2;
+      let bestId: string | null = null;
+      let bestDist = Infinity;
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const cardCenter = rect.left + rect.width / 2;
+        const dist = Math.abs(cardCenter - containerCenter);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = card.dataset.cardId ?? null;
+        }
+      });
+      if (bestId && bestId !== currentId) {
+        onChangeCurrentId(bestId);
       }
-    });
-    if (bestId && bestId !== currentId) {
-      onChangeCurrentId(bestId);
-    }
+    }, 80);
   }, [currentId, onChangeCurrentId]);
 
   if (!currentHolding) return null;
@@ -134,7 +139,10 @@ export function HoldingDetailSheet({
         )}
         style={{
           transform: dragOffset ? `translateY(${dragOffset}px)` : undefined,
-          transition: dragOffset ? 'none' : undefined,
+          // 拖動中:no transition,跟手指走;放開時:iOS spring curve bounce 回原位
+          transition: dragOffset
+            ? 'none'
+            : 'transform 280ms cubic-bezier(0.32, 0.72, 0, 1)',
         }}
         initialFocus={false}
       >
@@ -143,16 +151,17 @@ export function HoldingDetailSheet({
 
         {/* ── Top bar:drag handle + 標題 + 關閉 ── */}
         <div className="shrink-0">
-          {/* drag handle bar — touch 拖動關閉的入口 */}
+          {/* drag handle 觸發區 — 拉大到 44px 滿足 touch target,實際視覺只是中央那條 lozenge */}
           <div
             onTouchStart={onHandleTouchStart}
             onTouchMove={onHandleTouchMove}
             onTouchEnd={onHandleTouchEnd}
             onTouchCancel={onHandleTouchEnd}
-            className="pt-2.5 pb-1.5 flex justify-center cursor-grab active:cursor-grabbing"
+            className="h-11 flex items-center justify-center cursor-grab active:cursor-grabbing"
             style={{ touchAction: 'none' }}
+            aria-label="向下拖動關閉"
           >
-            <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+            <div className="h-1.5 w-12 rounded-full bg-foreground/25 shadow-[0_0_8px_oklch(0.78_0.18_210/0.3)]" />
           </div>
 
           {/* 標題列 — 對齊國泰「單一持股資訊 / 所有庫存」 + 右上「關閉」 */}
@@ -178,7 +187,7 @@ export function HoldingDetailSheet({
         <div
           ref={carouselRef}
           onScroll={handleCarouselScroll}
-          className="overflow-x-auto overflow-y-hidden scrollbar-none border-b shrink-0 bg-muted/20"
+          className="overflow-x-auto overflow-y-hidden scrollbar-none border-b border-white/5 shrink-0 bg-background/20 backdrop-blur-md"
           style={{
             scrollSnapType: 'x mandatory',
             scrollPaddingInline: '6%',
@@ -250,10 +259,14 @@ export function HoldingDetailSheet({
 
         {/* ── Sticky bottom action bar — 單一「新增一筆存款」 ── */}
         <div
-          className="border-t bg-popover shrink-0 p-3"
+          className="border-t border-white/10 bg-popover/60 backdrop-blur-xl shrink-0 p-3"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          <Button size="lg" onClick={onAddDepositClick} className="w-full gap-1.5">
+          <Button
+            size="lg"
+            onClick={onAddDepositClick}
+            className="w-full gap-1.5 shadow-[0_0_24px_oklch(0.78_0.18_210/0.3)]"
+          >
             <Plus className="h-4 w-4 shrink-0" />
             <span className="truncate">新增一筆存款</span>
           </Button>
@@ -351,7 +364,19 @@ function HoldingHeaderCard({
   const currencyTag = isUsdNative ? 'USD' : 'TWD';
 
   return (
-    <div className="rounded-2xl bg-card border border-border/60 px-4 py-4 shadow-sm">
+    <div
+      className={cn(
+        'relative overflow-hidden rounded-2xl px-4 py-4',
+        'bg-card/55 backdrop-blur-xl',
+        'border border-white/10',
+        'shadow-[0_8px_32px_rgba(0,0,0,0.3)]',
+      )}
+    >
+      {/* 玻璃卡上緣高光 */}
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
+      />
       {/* 標題列 */}
       <div className="text-center pb-3">
         <div className="text-xl font-display font-medium">
@@ -373,7 +398,7 @@ function HoldingHeaderCard({
 
       {/* 股價 / 成交均價 — 僅 stock/crypto */}
       {stockOrCrypto && (
-        <div className="grid grid-cols-2 gap-2 py-3 mb-3 rounded-md bg-muted/40">
+        <div className="relative grid grid-cols-2 gap-2 py-3 mb-3 rounded-lg bg-background/30 backdrop-blur-sm border border-white/5">
           <div className="text-center">
             <div className="text-xs text-muted-foreground">
               股價 ({currencyTag})
@@ -506,7 +531,7 @@ function TransactionRow({
     : '';
 
   return (
-    <div className="rounded-md border border-border bg-card p-3">
+    <div className="rounded-lg border border-white/8 bg-card/40 backdrop-blur-sm p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">

@@ -92,7 +92,7 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
       )}
     >
       {/* Type icon */}
-      <div className="h-10 w-10 shrink-0 rounded-full bg-muted inline-flex items-center justify-center text-muted-foreground">
+      <div className="h-10 w-10 shrink-0 rounded-full bg-background/40 backdrop-blur-sm border border-white/10 inline-flex items-center justify-center text-foreground/80 shadow-inner">
         <Icon className="h-4 w-4" />
       </div>
 
