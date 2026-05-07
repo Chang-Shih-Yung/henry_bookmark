@@ -18,3 +18,14 @@ if (!url || !token) {
 export const redis = new Redis({ url, token });
 
 export const holdingsKey = (email: string) => `holdings:${email.toLowerCase()}`;
+
+/** Web Push 訂閱(每個 user 可同時有多個裝置 → set of subscription JSONs)。 */
+export const pushSubscriptionsKey = (email: string) =>
+  `push:subscriptions:${email.toLowerCase()}`;
+
+/** 提醒設定(per user)。 */
+export const reminderConfigKey = (email: string) =>
+  `push:config:${email.toLowerCase()}`;
+
+/** 全部啟用提醒的 user emails(cron 跑時 query 這個 set 知道要對誰發)。 */
+export const enabledRemindersKey = () => 'push:enabled-emails';

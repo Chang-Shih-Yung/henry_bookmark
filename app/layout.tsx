@@ -23,6 +23,12 @@ const fontBody = Space_Grotesk({
 export const metadata: Metadata = {
   title: 'Henry Bookmark',
   description: '個人投資組合追蹤 + 長期資產試算',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    title: 'Bookmark',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export const viewport: Viewport = {

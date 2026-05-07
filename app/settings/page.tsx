@@ -2,6 +2,7 @@ import { auth, signOut } from '@/auth';
 import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { MobileShell } from '@/components/MobileShell';
+import { PushReminderSettings } from '@/components/PushReminderSettings';
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -37,6 +38,13 @@ export default async function SettingsPage() {
             Holdings 自動存在 Upstash Redis,跨裝置同步。匯出 / 匯入功能待 v2
             實作。
           </p>
+        </section>
+
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium font-display text-muted-foreground">
+            提醒
+          </h2>
+          <PushReminderSettings />
         </section>
 
 
