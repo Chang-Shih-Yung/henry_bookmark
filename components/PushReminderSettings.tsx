@@ -45,8 +45,21 @@ function isStandalone(): boolean {
   return nav.standalone === true;
 }
 
+/** 偵測 iOS(iPhone / iPad / iPod)— 用來判斷是否需要強制 standalone PWA */
+function isIOS(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = window.navigator.userAgent;
+  // iPad on iOS 13+ 會冒充 macOS,但 maxTouchPoints > 1
+  return (
+    /iPhone|iPad|iPod/.test(ua) ||
+    (ua.includes('Mac') && navigator.maxTouchPoints > 1)
+  );
+}
+
 export function PushReminderSettings() {
   const [supported, setSupported] = useState<boolean | null>(null);
+  const [standalone, setStandalone] = useState(false);
+  const [iosNotPwa, setIosNotPwa] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -61,6 +74,11 @@ export function PushReminderSettings() {
   // 初始化:檢查是否已訂閱 + 載入 config
   useEffect(() => {
     (async () => {
+      const inStandalone = isStandalone();
+      setStandalone(inStandalone);
+      // iOS 必須是 standalone PWA 才能 push;Safari 書籤不行
+      setIosNotPwa(isIOS() && !inStandalone);
+
       const ok = isPushSupported();
       setSupported(ok);
       if (!ok) {
@@ -173,8 +191,6 @@ export function PushReminderSettings() {
           </div>
           <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
             每月固定日期、台灣時間,自動推送通知到這台裝置。
-            {!isStandalone() &&
-              ' iPhone 必須先把網站「加入主畫面」才會收到。'}
           </p>
         </div>
         {busy ? (
@@ -183,11 +199,54 @@ export function PushReminderSettings() {
           <Switch
             checked={enabled}
             onCheckedChange={onToggle}
+            disabled={iosNotPwa}
             aria-label={enabled ? '停用提醒' : '啟用提醒'}
             className="shrink-0"
           />
         )}
       </div>
+
+      {/* iOS 必須 standalone PWA — 用書籤打開不行,強制提示 */}
+      {iosNotPwa && (
+        <div className="rounded-md border border-warning/40 bg-warning/5 p-3 text-[11px] text-warning leading-relaxed">
+          <div className="font-medium mb-1">⚠ iOS 必須加入主畫面才能收通知</div>
+          <div className="text-muted-foreground">
+            你目前是用 Safari 開的(或書籤捷徑直接開到 Safari)。iOS 17.4+ 規定 Web Push 只能透過「加入主畫面」的 PWA 收。
+            <br />
+            <strong className="text-foreground">操作:</strong>
+            Safari 底部分享 ⬆ → <strong>加入主畫面</strong>(不是「加入書籤」)→
+            從主畫面那個 icon 開啟(不會有上下 Safari bar) → 回來這頁打開開關。
+          </div>
+        </div>
+      )}
+
+      {/* 已是 PWA — 顯示診斷資訊讓 user 看得見當前狀態 */}
+      {standalone && (
+        <div className="rounded-md border border-white/10 bg-background/30 p-3 text-[10px] font-mono text-muted-foreground leading-relaxed">
+          <div>● PWA 模式: <span className="text-up">是</span></div>
+          <div>
+            ● 通知權限:{' '}
+            <span
+              className={
+                typeof Notification !== 'undefined' &&
+                Notification.permission === 'granted'
+                  ? 'text-up'
+                  : 'text-warning'
+              }
+            >
+              {typeof Notification !== 'undefined'
+                ? Notification.permission
+                : '不支援'}
+            </span>
+          </div>
+          <div>
+            ● 訂閱狀態:{' '}
+            <span className={enabled ? 'text-up' : 'text-muted-foreground'}>
+              {enabled ? '已訂閱' : '未訂閱'}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3 pt-2 border-t border-white/8">
         <div className="grid grid-cols-2 gap-3">

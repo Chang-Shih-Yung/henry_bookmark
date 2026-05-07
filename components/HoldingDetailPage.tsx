@@ -147,7 +147,16 @@ export function HoldingDetailPage({ id }: Props) {
         className="mx-auto w-full max-w-2xl p-4 pb-32"
         style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
       >
-        <BackBar onBack={() => router.push('/')} />
+        <header className="relative h-12 flex items-center px-2">
+          <button
+            type="button"
+            onClick={() => router.push('/')}
+            aria-label="返回"
+            className="inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-accent/30 active:bg-accent/50 transition-colors -ml-1"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+        </header>
         <div className="text-sm text-muted-foreground mt-6">
           找不到這筆資產(可能已刪除)。
         </div>
@@ -193,25 +202,35 @@ export function HoldingDetailPage({ id }: Props) {
       className="mx-auto w-full max-w-2xl pb-32 flex flex-col min-h-dvh"
       style={{ paddingTop: 'max(0.25rem, env(safe-area-inset-top))' }}
     >
-      <BackBar onBack={() => router.push('/')} />
+      {/* iOS-style nav header:返回箭頭 + 標題同一行,標題置中 */}
+      <header className="relative h-12 flex items-center justify-center px-2">
+        <button
+          type="button"
+          onClick={() => router.push('/')}
+          aria-label="返回"
+          className="absolute left-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-accent/30 active:bg-accent/50 transition-colors"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+        <div className="text-center">
+          <div className="text-sm font-medium leading-tight">單一持股資訊</div>
+          <div className="text-[11px] text-muted-foreground leading-tight">
+            所有庫存
+          </div>
+        </div>
+      </header>
 
-      {/* 標題列 — 國泰風格「單一持股資訊 / 所有庫存」 */}
-      <div className="text-center pt-1 pb-3">
-        <div className="text-sm font-medium">單一持股資訊</div>
-        <div className="text-[11px] text-muted-foreground">所有庫存</div>
-      </div>
-
-      {/* Carousel header */}
+      {/* Carousel header — w-[80%] 之前 parent px-[10%] 把實際寬度壓成 64%
+          (% width 用 parent content-box,padding 吃掉 20% 後 80% × 80% = 64%)
+          改用左右 spacer 提供 scroll-padding 效果,卡牌 w-[80%] 才是真正 80% viewport */}
       <div
         ref={carouselRef}
         onScroll={handleCarouselScroll}
         className="overflow-x-auto overflow-y-hidden scrollbar-none border-y border-white/5 bg-background/20"
-        style={{
-          scrollSnapType: 'x mandatory',
-          scrollPaddingInline: '10%',
-        }}
+        style={{ scrollSnapType: 'x mandatory' }}
       >
-        <div className="flex gap-3 px-[10%] py-4">
+        <div className="flex gap-3 py-4">
+          <div className="shrink-0 w-[10%]" aria-hidden />
           {siblings.map((h) => (
             <div
               key={h.id}
@@ -226,6 +245,7 @@ export function HoldingDetailPage({ id }: Props) {
               />
             </div>
           ))}
+          <div className="shrink-0 w-[10%]" aria-hidden />
         </div>
         {siblings.length > 1 && (
           <div className="text-[10px] text-muted-foreground/70 text-center pb-2 tabular-nums">
@@ -305,21 +325,6 @@ export function HoldingDetailPage({ id }: Props) {
         onConfirm={replaceHolding}
       />
     </main>
-  );
-}
-
-function BackBar({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="px-2 py-1 flex items-center">
-      <button
-        type="button"
-        onClick={onBack}
-        aria-label="返回"
-        className="inline-flex items-center justify-center h-10 w-10 rounded-full text-foreground hover:bg-accent/30 transition-colors -ml-1"
-      >
-        <ChevronLeft className="h-6 w-6" />
-      </button>
-    </div>
   );
 }
 
@@ -449,7 +454,7 @@ function HoldingHeaderCard({
       </div>
 
       {stockOrCrypto && (
-        <div className="relative grid grid-cols-2 py-3 mb-3 rounded-lg bg-background/30 backdrop-blur-sm border border-white/5">
+        <div className="relative grid grid-cols-2 py-3 mb-3 rounded-lg bg-foreground/[0.06] border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <div className="text-center px-2">
             <div className="text-[11px] text-muted-foreground">
               股價 ({currencyTag})
@@ -458,7 +463,7 @@ function HoldingHeaderCard({
               {priceStr}
             </div>
           </div>
-          <div className="text-center border-l border-white/10 px-2">
+          <div className="text-center border-l border-white/15 px-2">
             <div className="text-[11px] text-muted-foreground inline-flex items-center justify-center gap-1">
               成交均價 ({currencyTag})
               <button

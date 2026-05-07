@@ -19,6 +19,7 @@ export async function POST() {
 
   // 提早抓 VAPID 環境變數,缺就直接回明確錯誤
   if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    console.error('[push/test] VAPID keys missing in env', email);
     return Response.json(
       { ok: false, reason: '伺服器 VAPID 金鑰未設定 — Vercel env 缺 NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY' },
       { status: 200 },
@@ -26,9 +27,13 @@ export async function POST() {
   }
 
   const subs = await redis.smembers(pushSubscriptionsKey(email));
+  console.log('[push/test] sub count for', email, '=', subs.length);
   if (subs.length === 0) {
     return Response.json(
-      { ok: false, reason: '沒有訂閱裝置 — 請先啟用提醒' },
+      {
+        ok: false,
+        reason: '沒有訂閱裝置 — 請先把網站「加入主畫面」用 PWA 開啟,然後打開「月扣提醒」開關',
+      },
       { status: 200 },
     );
   }

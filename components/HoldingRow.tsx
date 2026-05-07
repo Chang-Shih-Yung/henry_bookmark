@@ -84,11 +84,15 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
       }}
       {...attributes}
       className={cn(
-        'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors cursor-pointer',
+        'w-full flex items-center gap-3 px-3 py-3 text-left cursor-pointer',
+        'transition-[transform,background-color,border-color] duration-150',
         // 粒粒分明:每張 row 自己一張卡,半透明 + backdrop blur 讓 ambient 漸層滲透
         'rounded-xl border border-white/10 bg-card/55 backdrop-blur-sm',
         'shadow-[0_2px_8px_rgba(0,0,0,0.15)]',
-        'hover:bg-card/70 active:bg-card/80',
+        // 點擊回饋 — iOS 上 hover 沒效果,active 才看得到。多加 scale 給 tactile 感
+        'hover:bg-card/70 active:bg-card/85 active:scale-[0.985] active:border-white/20',
+        // iOS Safari 預設會在點擊時加灰色 highlight overlay,跟我們 active 樣式打架,關掉
+        '[-webkit-tap-highlight-color:transparent]',
         // 拖動 grip 時不要被 iOS 文字選取干擾;但卡身保持可滾動(touch-action 不鎖)
         'select-none [-webkit-user-select:none] [-webkit-touch-callout:none]',
       )}

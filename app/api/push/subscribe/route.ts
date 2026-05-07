@@ -30,17 +30,26 @@ const SubscribeBody = z.object({
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.email) {
+    console.warn('[push/subscribe] unauthorized — no session');
     return new Response('Unauthorized', { status: 401 });
   }
   const email = session.user.email;
   const json = await req.json().catch(() => null);
   const parsed = SubscribeBody.safeParse(json);
   if (!parsed.success) {
+    console.error('[push/subscribe] invalid_body', email, parsed.error.issues);
     return Response.json(
       { error: 'invalid_body', issues: parsed.error.issues },
       { status: 400 },
     );
   }
+
+  console.log(
+    '[push/subscribe] adding subscription',
+    email,
+    'endpoint host:',
+    new URL(parsed.data.subscription.endpoint).host,
+  );
 
   const subKey = pushSubscriptionsKey(email);
   // sadd 把這個 subscription 加到 user 的 set(同 endpoint 不會重複)
