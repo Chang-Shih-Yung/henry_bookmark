@@ -169,6 +169,18 @@ export async function fetchReminderConfig(): Promise<{
   return res.json();
 }
 
+export type Device = { provider: string; host: string; hash: string };
+export async function fetchDevices(): Promise<Device[]> {
+  try {
+    const res = await fetch('/api/push/devices');
+    if (!res.ok) return [];
+    const data = (await res.json()) as { devices?: Device[] };
+    return data.devices ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function sendTestPush(): Promise<{
   ok: boolean;
   sentCount?: number;

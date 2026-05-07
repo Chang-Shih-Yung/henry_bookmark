@@ -191,7 +191,9 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
           title: (items: TooltipItem<'line'>[]) => items[0]?.label ?? '',
           label: (ctx: TooltipItem<'line'>) => {
             const v = ctx.parsed.y;
-            return privacy || v === null ? '••••••' : formatTwd(v);
+            const formatted =
+              privacy || v === null ? '••••••' : formatTwd(v);
+            return `累計投入 ${formatted}`;
           },
         },
       },
@@ -346,12 +348,48 @@ function expandToCalendarMonths(
 }
 
 function buildSeries(enriched: EnrichedHolding[]): Series {
+  // 累積投入的真實值來自 holding.costBasisTwd(總成本),
+  // 但 transactions 只是「有記錄到的」交易 — 早期既有持倉沒記錄交易時,
+  // sum(tx.costDeltaTwd) < costBasisTwd → 圖會嚴重低估
+  // (Henry 看到 26/05 = 4500 而非實際的 28k 就是這 bug)
+  //
+  // 修法:每個 holding 的 costBasisTwd 減 sum(tx) = baseline(交易紀錄前的既有成本),
+  // 把 baseline 當成「最早一筆 tx 之前」的零點,加進該 holding 的最早 tx 月份(或 holding.updatedAt)
   const allTx: { occurredAt: Date; costDeltaTwd: number }[] = [];
   for (const h of enriched) {
-    for (const tx of h.transactions ?? []) {
-      const d = new Date(tx.occurredAt);
-      if (!isNaN(d.getTime())) {
-        allTx.push({ occurredAt: d, costDeltaTwd: tx.costDeltaTwd });
+    const txs = (h.transactions ?? []).filter(
+      (t) => !isNaN(new Date(t.occurredAt).getTime()),
+    );
+    const txSum = txs.reduce((s, t) => s + t.costDeltaTwd, 0);
+    const baseline = h.costBasisTwd - txSum;
+
+    if (txs.length === 0) {
+      // 完全沒有交易紀錄 → 用 holding.updatedAt 當作這筆 cost 的時間
+      // (假設 user 是在那個時點建立 holding 的)
+      if (h.costBasisTwd > 0) {
+        const d = new Date(h.updatedAt);
+        if (!isNaN(d.getTime())) {
+          allTx.push({ occurredAt: d, costDeltaTwd: h.costBasisTwd });
+        }
+      }
+    } else {
+      // 有交易,但 baseline 可能 > 0(早期既有持倉)→ 把 baseline 塞最早 tx 之前一秒
+      if (Math.abs(baseline) >= 1) {
+        const earliest = txs.reduce(
+          (e, t) => {
+            const d = new Date(t.occurredAt);
+            return d.getTime() < e.getTime() ? d : e;
+          },
+          new Date(txs[0].occurredAt),
+        );
+        const beforeEarliest = new Date(earliest.getTime() - 1000);
+        allTx.push({ occurredAt: beforeEarliest, costDeltaTwd: baseline });
+      }
+      for (const tx of txs) {
+        allTx.push({
+          occurredAt: new Date(tx.occurredAt),
+          costDeltaTwd: tx.costDeltaTwd,
+        });
       }
     }
   }

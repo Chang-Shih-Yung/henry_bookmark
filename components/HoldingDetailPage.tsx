@@ -241,12 +241,12 @@ export function HoldingDetailPage({ id }: Props) {
         style={{ scrollSnapType: 'x mandatory' }}
       >
         <div className="flex gap-3 py-4">
-          <div className="shrink-0 w-[10%]" aria-hidden />
+          <div className="shrink-0 w-[8%]" aria-hidden />
           {siblings.map((h) => (
             <div
               key={h.id}
               data-card-id={h.id}
-              className="snap-center shrink-0 w-[80%]"
+              className="snap-center shrink-0 w-[84%]"
             >
               <HoldingHeaderCard
                 holding={h}
@@ -256,7 +256,7 @@ export function HoldingDetailPage({ id }: Props) {
               />
             </div>
           ))}
-          <div className="shrink-0 w-[10%]" aria-hidden />
+          <div className="shrink-0 w-[8%]" aria-hidden />
         </div>
         {siblings.length > 1 && (
           <div className="text-[10px] text-muted-foreground/70 text-center pb-2 tabular-nums">

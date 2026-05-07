@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus,
@@ -92,6 +92,34 @@ export function Dashboard() {
     if (!holdingsQ.data || !pricesQ.data) return [];
     return holdingsQ.data.items.map((h) => enrichHolding(h, pricesQ.data));
   }, [holdingsQ.data, pricesQ.data]);
+
+  // 滾動位置保留:點卡牌跳詳情前存 scrollY,首頁 mount 後 restore。
+  // Next.js App Router 的 router.back() 在某些情況(react-query 重 fetch 改變 layout
+  // / 動態 PWA SW 更新 / iOS Safari 沒走 bfcache)scroll restoration 會失效,自己存最穩。
+  useEffect(() => {
+    const SCROLL_KEY = 'dashboard-scroll-y';
+    // 先嘗試 restore — 等 enriched data 載入完(layout 高度穩定)再 scroll
+    if (enriched.length > 0) {
+      const saved = sessionStorage.getItem(SCROLL_KEY);
+      if (saved) {
+        const y = parseInt(saved, 10);
+        if (!isNaN(y) && y > 0) {
+          // 雙 RAF 確保 DOM paint 完才 scroll(否則 height 還沒穩會被 clip)
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: y, behavior: 'instant' });
+              sessionStorage.removeItem(SCROLL_KEY);
+            });
+          });
+        }
+      }
+    }
+  }, [enriched.length]);
+
+  const goToHolding = (id: string) => {
+    sessionStorage.setItem('dashboard-scroll-y', String(window.scrollY));
+    router.push(`/holding/${id}`);
+  };
 
   const summary = useMemo(
     () => computeSummary(enriched, defaultConfig.goalTwd),
@@ -356,7 +384,7 @@ export function Dashboard() {
                     key={h.id}
                     holding={h}
                     usdTwd={pricesQ.data?.usdTwd}
-                    onCardClick={() => router.push(`/holding/${h.id}`)}
+                    onCardClick={() => goToHolding(h.id)}
                   />
                 ))}
               </div>

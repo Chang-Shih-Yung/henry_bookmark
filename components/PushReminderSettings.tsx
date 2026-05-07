@@ -8,6 +8,8 @@ import { FieldLabel } from '@/components/ui/field-label';
 import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
+  type Device,
+  fetchDevices,
   fetchReminderConfig,
   forceResubscribe,
   getCurrentSubscription,
@@ -63,8 +65,14 @@ export function PushReminderSettings() {
   const [standalone, setStandalone] = useState(false);
   const [iosNotPwa, setIosNotPwa] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const refreshDevices = async () => {
+    const list = await fetchDevices();
+    setDevices(list);
+  };
   const [day, setDay] = useState(6);
   const [hour, setHour] = useState(12);
   const [title, setTitle] = useState('月扣記錄日');
@@ -90,13 +98,13 @@ export function PushReminderSettings() {
       const sub = await getCurrentSubscription();
       setEnabled(!!sub);
       // 同步:browser 認得這個 sub,server 不一定有 — 強制 re-POST 一次確保 redis 收到
-      // (常見:舊 build 曾訂閱但 POST 失敗、Redis 被清、Vercel 環境換,結果 test 永遠 sentCount=0)
       if (sub) {
         const sync = await syncSubscriptionToServer();
         if (!sync.ok) {
           console.warn('[push] sync failed', sync.reason);
         }
       }
+      await refreshDevices();
       const cfg = await fetchReminderConfig();
       if (cfg) {
         setDay(cfg.day);
@@ -272,6 +280,22 @@ export function PushReminderSettings() {
               {enabled ? '已訂閱' : '未訂閱'}
             </span>
           </div>
+          <div>
+            ● 已註冊裝置:{' '}
+            <span className={devices.length > 0 ? 'text-up' : 'text-muted-foreground'}>
+              {devices.length} 台
+            </span>
+          </div>
+          {devices.length > 0 && (
+            <div className="mt-1.5 pl-3 space-y-0.5">
+              {devices.map((d, i) => (
+                <div key={d.hash || i} className="text-muted-foreground/80">
+                  {i + 1}. {d.provider}{' '}
+                  <span className="text-muted-foreground/50">…{d.hash}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
