@@ -226,7 +226,7 @@ export function HoldingDetailPage({ id }: Props) {
       <div
         ref={carouselRef}
         onScroll={handleCarouselScroll}
-        className="overflow-x-auto overflow-y-hidden scrollbar-none border-y border-white/5 bg-background/20"
+        className="overflow-x-auto overflow-y-hidden scrollbar-none"
         style={{ scrollSnapType: 'x mandatory' }}
       >
         <div className="flex gap-3 py-4">
@@ -456,7 +456,8 @@ function HoldingHeaderCard({
       {stockOrCrypto && (
         <div className="relative grid grid-cols-2 py-3 mb-3 rounded-lg bg-foreground/[0.06] border border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
           <div className="text-center px-2">
-            <div className="text-[11px] text-muted-foreground">
+            {/* 統一 label 高度 h-5,讓兩欄基準線對齊 — 右欄因為有 pencil 按鈕 inline-flex 會撐高,左欄要一起 h-5 不然數字基準線歪 */}
+            <div className="h-5 flex items-center justify-center text-[11px] text-muted-foreground">
               股價 ({currencyTag})
             </div>
             <div className="text-lg font-semibold font-display tabular-nums mt-1">
@@ -464,8 +465,8 @@ function HoldingHeaderCard({
             </div>
           </div>
           <div className="text-center border-l border-white/15 px-2">
-            <div className="text-[11px] text-muted-foreground inline-flex items-center justify-center gap-1">
-              成交均價 ({currencyTag})
+            <div className="h-5 flex items-center justify-center gap-1 text-[11px] text-muted-foreground">
+              <span>成交均價 ({currencyTag})</span>
               <button
                 type="button"
                 onClick={onEditAvgClick}

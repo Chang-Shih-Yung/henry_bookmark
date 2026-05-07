@@ -42,6 +42,34 @@ export async function getCurrentSubscription(): Promise<PushSubscription | null>
   return reg.pushManager.getSubscription();
 }
 
+/**
+ * 把當前瀏覽器的 subscription 重新 POST 到 server。
+ * 用來修「browser 有 sub、server 沒記錄」的不同步狀態
+ * (常發生:舊 build 訂閱過,但那次 POST 失敗 / 環境變數改過 / Redis 被清過)。
+ * server 端是 set semantics,重複 POST 不會壞,只會確保 server 認得這個裝置。
+ */
+export async function syncSubscriptionToServer(): Promise<{ ok: boolean; reason?: string }> {
+  if (!isPushSupported()) return { ok: false, reason: '不支援推送' };
+  const sub = await getCurrentSubscription();
+  if (!sub) return { ok: false, reason: '瀏覽器無訂閱' };
+  const res = await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subscription: sub.toJSON() }),
+  });
+  if (!res.ok) return { ok: false, reason: `Server ${res.status}` };
+  return { ok: true };
+}
+
+/** 強制重新訂閱:先 unsubscribe(瀏覽器+server)再重新 subscribe。
+ *  用來修「瀏覽器訂閱資料過期 / VAPID 換掉 / 訂閱失效但 cache 還在」。 */
+export async function forceResubscribe(
+  config?: { day?: number; hour?: number; title?: string; body?: string },
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  await unsubscribePush();
+  return subscribePush(config);
+}
+
 export async function subscribePush(
   config?: { day?: number; hour?: number; title?: string; body?: string },
 ): Promise<{ ok: true } | { ok: false; reason: string }> {

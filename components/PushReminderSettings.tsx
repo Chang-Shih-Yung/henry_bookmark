@@ -9,11 +9,13 @@ import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   fetchReminderConfig,
+  forceResubscribe,
   getCurrentSubscription,
   isPushSupported,
   patchReminderConfig,
   sendTestPush,
   subscribePush,
+  syncSubscriptionToServer,
   unsubscribePush,
 } from '@/lib/notifications';
 import { toast } from 'sonner';
@@ -87,6 +89,14 @@ export function PushReminderSettings() {
       }
       const sub = await getCurrentSubscription();
       setEnabled(!!sub);
+      // 同步:browser 認得這個 sub,server 不一定有 — 強制 re-POST 一次確保 redis 收到
+      // (常見:舊 build 曾訂閱但 POST 失敗、Redis 被清、Vercel 環境換,結果 test 永遠 sentCount=0)
+      if (sub) {
+        const sync = await syncSubscriptionToServer();
+        if (!sync.ok) {
+          console.warn('[push] sync failed', sync.reason);
+        }
+      }
       const cfg = await fetchReminderConfig();
       if (cfg) {
         setDay(cfg.day);
@@ -134,6 +144,23 @@ export function PushReminderSettings() {
         setDirty(false);
       } else {
         toast.error('儲存失敗');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onResubscribe = async () => {
+    setBusy(true);
+    try {
+      const res = await forceResubscribe({ day, hour, title, body });
+      if (res.ok) {
+        setEnabled(true);
+        toast.success('重新訂閱成功', {
+          description: '舊訂閱已清掉,server 收到新 subscription',
+        });
+      } else {
+        toast.error('重新訂閱失敗', { description: res.reason });
       }
     } finally {
       setBusy(false);
@@ -349,20 +376,38 @@ export function PushReminderSettings() {
         )}
 
         {enabled && !dirty && (
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={onTestPush}
-            disabled={busy}
-            className="w-full"
-          >
-            {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              '發送測試通知'
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={onTestPush}
+              disabled={busy}
+              className="w-full"
+            >
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                '發送測試通知'
+              )}
+            </Button>
+            {standalone && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onResubscribe}
+                disabled={busy}
+                className="w-full text-xs text-muted-foreground hover:text-foreground"
+              >
+                {busy ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  '測試失敗?點這裡重新訂閱(清掉舊 cache)'
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         )}
       </div>
     </div>

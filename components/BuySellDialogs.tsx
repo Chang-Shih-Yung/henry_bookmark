@@ -182,7 +182,6 @@ export function BuyDialog({
                 value={units}
                 onChange={(e) => setUnits(e.target.value)}
                 className="text-base h-11"
-                autoFocus
               />
               <p className="text-xs text-muted-foreground mt-1.5">
                 目前{' '}
@@ -216,7 +215,6 @@ export function BuyDialog({
               value={cost}
               onChange={(e) => setCost(e.target.value)}
               className="text-base h-11"
-              autoFocus={isCash}
             />
             <p className="text-xs text-muted-foreground mt-1.5">
               目前{' '}
