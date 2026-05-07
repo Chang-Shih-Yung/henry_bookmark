@@ -10,6 +10,12 @@ import {
 import type { PortfolioSummary } from '@/lib/types';
 import { formatTwd } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import {
+  accentBrandAlpha,
+  ACCENT_BRAND,
+  FOREGROUND,
+  POPOVER_BG,
+} from '@/lib/colors';
 
 ChartJS.register(ArcElement, Tooltip);
 
@@ -22,14 +28,14 @@ const TYPE_LABELS: Record<string, string> = {
   trust: '信託',
 };
 
-// 對齊 globals.css chart-1~5 + up color。每色都是科技感 oklch palette。
+// 科技感 oklch palette,主品牌色 violet 給「美股」(英文資產),其他依視覺辨識度分配。
 const TYPE_COLORS: Record<string, string> = {
   tw_stock: 'oklch(0.7 0.22 25)',     // 台股紅(配合台灣紅漲)
-  us_stock: 'oklch(0.78 0.18 210)',   // teal(品牌色)
-  crypto: 'oklch(0.82 0.17 80)',      // amber
-  cash_twd: 'oklch(0.78 0.18 195)',   // cyan
-  cash_usd: 'oklch(0.65 0.22 290)',   // violet
-  trust: 'oklch(0.708 0 0)',          // muted neutral(信託沒市場色)
+  us_stock: ACCENT_BRAND,              // violet 品牌色
+  crypto: 'oklch(0.82 0.17 80)',       // amber
+  cash_twd: 'oklch(0.78 0.18 195)',    // cyan
+  cash_usd: 'oklch(0.65 0.22 320)',    // magenta
+  trust: 'oklch(0.708 0 0)',           // muted neutral(信託沒市場色)
 };
 
 export function AllocationPie({ summary }: { summary: PortfolioSummary }) {
@@ -52,8 +58,10 @@ export function AllocationPie({ summary }: { summary: PortfolioSummary }) {
         data: entries.map(([, v]) => v.value),
         backgroundColor: entries.map(([t]) => TYPE_COLORS[t] ?? '#000'),
         borderWidth: 0,
-        // 環狀外緣留 2px gap,讓區段彼此有呼吸
-        spacing: 2,
+        // 環狀外緣留 6px gap,給每段呼吸感
+        spacing: 6,
+        // 兩端做圓角(Chart.js v4 ArcElement 支援 borderRadius)
+        borderRadius: 8,
         // hover 突出
         hoverOffset: 6,
       },
@@ -71,10 +79,10 @@ export function AllocationPie({ summary }: { summary: PortfolioSummary }) {
             plugins: {
               legend: { display: false }, // 自己畫 legend
               tooltip: {
-                backgroundColor: 'oklch(0.205 0 0 / 0.95)',
-                titleColor: 'oklch(0.78 0.18 210)',
-                bodyColor: 'oklch(0.985 0 0)',
-                borderColor: 'oklch(0.78 0.18 210 / 0.4)',
+                backgroundColor: POPOVER_BG,
+                titleColor: ACCENT_BRAND,
+                bodyColor: FOREGROUND,
+                borderColor: accentBrandAlpha(0.4),
                 borderWidth: 1,
                 padding: 8,
                 cornerRadius: 6,

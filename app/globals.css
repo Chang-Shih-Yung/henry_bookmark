@@ -99,8 +99,8 @@
   --up: oklch(0.7 0.22 25);
   --down: oklch(0.72 0.18 165);
   --warning: oklch(0.82 0.17 80);
-  /* 品牌冷光 teal,提高飽和度讓 active 狀態更顯,符合科技感 */
-  --accent-brand: oklch(0.78 0.18 210);
+  /* 品牌色:藍紫(violet/indigo),金融科技感 */
+  --accent-brand: oklch(0.68 0.22 280);
 
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -121,7 +121,7 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
   /* 圖表色從灰階改成科技感配色 — teal / violet / cyan / rose / amber */
-  --chart-1: oklch(0.78 0.18 210); /* teal — 跟品牌色一致 */
+  --chart-1: oklch(0.68 0.22 280); /* violet — 跟品牌色一致 */
   --chart-2: oklch(0.65 0.22 290); /* violet */
   --chart-3: oklch(0.78 0.18 195); /* cyan */
   --chart-4: oklch(0.72 0.2 25);   /* rose */

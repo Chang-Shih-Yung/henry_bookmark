@@ -253,7 +253,7 @@ export function HoldingDetailSheet({
           <Button
             size="lg"
             onClick={onAddDepositClick}
-            className="w-full gap-1.5 shadow-[0_0_24px_oklch(0.78_0.18_210/0.3)]"
+            className="w-full gap-1.5 shadow-[0_0_24px_var(--accent-brand)]"
           >
             <Plus className="h-4 w-4 shrink-0" />
             <span className="truncate">新增一筆存款</span>

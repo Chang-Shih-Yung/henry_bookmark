@@ -15,6 +15,19 @@ import {
 import { Line } from 'react-chartjs-2';
 import type { EnrichedHolding } from '@/lib/types';
 import { formatTwd } from '@/lib/format';
+import {
+  accentBrandAlpha,
+  FOREGROUND,
+  MUTED,
+  POPOVER_BG,
+  POPOVER_BORDER,
+  TREND_DOWN,
+  TREND_FLAT,
+  TREND_UP,
+  trendDownAlpha,
+  trendFlatAlpha,
+  trendUpAlpha,
+} from '@/lib/colors';
 import { cn } from '@/lib/utils';
 
 ChartJS.register(
@@ -33,13 +46,12 @@ type Props = {
 };
 
 /**
- * 累計資產投入曲線 — Chart.js 深度客製,風格對齊參考截圖:
- * 漸層 stroke + 漸層 fill + 隱藏 grid/y-ticks + 終點 dot + tooltip pill
+ * 累計資產投入曲線(Chart.js + 客製樣式)。
+ * 線條顏色按趨勢方向變:漲 = 藍紫 / 平 = 白 / 跌 = 淺橘紅。
  */
 export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
   const series = useMemo(() => buildSeries(enriched), [enriched]);
 
-  // 沒任何交易 → 完全無資料
   if (series.points.length === 0) {
     return (
       <div className="rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-6 text-center text-sm text-muted-foreground">
@@ -48,28 +60,40 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
     );
   }
 
-  // 只有一筆 → 補一個「上個月為 0」的虛擬起點,從 0 拉一條線到第一筆,圖表才有形狀
-  const augmented = series.points.length === 1
-    ? [
-        (() => {
-          const onlyLabel = series.points[0].label;
-          const [yy, mm] = onlyLabel.split('/').map(Number);
-          // 算前一個月 label
-          const prevYY = mm === 1 ? yy - 1 : yy;
-          const prevMM = mm === 1 ? 12 : mm - 1;
-          return {
-            label: `${String(prevYY).padStart(2, '0')}/${String(prevMM).padStart(2, '0')}`,
-            cumulativeCost: 0,
-          };
-        })(),
-        ...series.points,
-      ]
-    : series.points;
+  // 一筆 → 補虛擬零起點
+  const augmented =
+    series.points.length === 1
+      ? [
+          (() => {
+            const [yy, mm] = series.points[0].label.split('/').map(Number);
+            const prevYY = mm === 1 ? yy - 1 : yy;
+            const prevMM = mm === 1 ? 12 : mm - 1;
+            return {
+              label: `${String(prevYY).padStart(2, '0')}/${String(prevMM).padStart(2, '0')}`,
+              cumulativeCost: 0,
+            };
+          })(),
+          ...series.points,
+        ]
+      : series.points;
 
   const labels = augmented.map((p) => p.label);
   const values = augmented.map((p) => p.cumulativeCost);
-  const lastIdx = values.length - 1;
   const positive = series.currentMarketValue >= series.totalCost;
+
+  // 趨勢方向:看曲線最後一段比首段升 / 平 / 跌(用相對變化判斷)
+  const first = values[0] ?? 0;
+  const last = values[values.length - 1] ?? 0;
+  const delta = last - first;
+  const denom = Math.max(Math.abs(first), 1);
+  const relative = delta / denom;
+  const trend: 'up' | 'flat' | 'down' =
+    relative > 0.02 ? 'up' : relative < -0.02 ? 'down' : 'flat';
+
+  const trendColor =
+    trend === 'up' ? TREND_UP : trend === 'down' ? TREND_DOWN : TREND_FLAT;
+  const trendAlpha =
+    trend === 'up' ? trendUpAlpha : trend === 'down' ? trendDownAlpha : trendFlatAlpha;
 
   const data = {
     labels,
@@ -78,43 +102,41 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
         label: '累計投入',
         data: values,
         borderWidth: 2,
-        // 平滑曲線
         tension: 0.4,
-        // 漸層 stroke(teal → cyan)
+        // 漸層 stroke:左端柔色 → 右端飽和趨勢色,給「最新方向」視覺提示
         borderColor: (ctx: { chart: ChartJS }) => {
           const { chart } = ctx;
-          if (!chart.chartArea) return 'oklch(0.78 0.18 210)';
-          const gradient = chart.ctx.createLinearGradient(
+          if (!chart.chartArea) return trendColor;
+          const g = chart.ctx.createLinearGradient(
             chart.chartArea.left,
             0,
             chart.chartArea.right,
             0,
           );
-          gradient.addColorStop(0, 'oklch(0.7 0.18 195)');
-          gradient.addColorStop(1, 'oklch(0.78 0.2 210)');
-          return gradient;
+          g.addColorStop(0, trendAlpha(0.5));
+          g.addColorStop(1, trendColor);
+          return g;
         },
-        // 漸層 fill(teal 35% → transparent)
+        // 漸層 fill 條件化(同色但下方淡)
         backgroundColor: (ctx: { chart: ChartJS }) => {
           const { chart } = ctx;
-          if (!chart.chartArea) return 'oklch(0.78 0.18 210 / 0.2)';
-          const gradient = chart.ctx.createLinearGradient(
+          if (!chart.chartArea) return trendAlpha(0.18);
+          const g = chart.ctx.createLinearGradient(
             0,
             chart.chartArea.top,
             0,
             chart.chartArea.bottom,
           );
-          gradient.addColorStop(0, 'oklch(0.78 0.18 210 / 0.4)');
-          gradient.addColorStop(1, 'oklch(0.78 0.18 210 / 0)');
-          return gradient;
+          g.addColorStop(0, trendAlpha(0.4));
+          g.addColorStop(1, trendAlpha(0));
+          return g;
         },
         fill: true,
-        // 預設不顯示 point,只在最後一點 + hover 才顯示
         pointRadius: (ctx: { dataIndex: number }) =>
-          ctx.dataIndex === lastIdx ? 5 : 0,
+          ctx.dataIndex === values.length - 1 ? 5 : 0,
         pointHoverRadius: 6,
         pointBackgroundColor: 'oklch(0.205 0 0)',
-        pointBorderColor: 'oklch(0.78 0.18 210)',
+        pointBorderColor: trendColor,
         pointBorderWidth: 2,
         pointHitRadius: 24,
       },
@@ -131,19 +153,16 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: 'oklch(0.205 0 0 / 0.95)',
-        titleColor: 'oklch(0.78 0.18 210)',
-        bodyColor: 'oklch(0.985 0 0)',
-        borderColor: 'oklch(0.78 0.18 210 / 0.4)',
+        backgroundColor: POPOVER_BG,
+        titleColor: trendColor,
+        bodyColor: FOREGROUND,
+        borderColor: trendAlpha(0.4),
         borderWidth: 1,
         padding: 8,
         boxPadding: 0,
         cornerRadius: 6,
         displayColors: false,
-        titleFont: {
-          size: 10,
-          weight: 'normal',
-        },
+        titleFont: { size: 10, weight: 'normal' },
         bodyFont: {
           size: 12,
           weight: 600,
@@ -163,52 +182,60 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
         grid: { display: false },
         border: { display: false },
         ticks: {
-          color: 'oklch(0.708 0 0)',
-          font: {
-            size: 10,
-            family: 'var(--font-display)',
-          },
+          color: MUTED,
+          font: { size: 10, family: 'var(--font-display)' },
           maxRotation: 0,
           autoSkip: true,
           autoSkipPadding: 24,
         },
       },
       y: {
-        // 完全隱藏 y 軸 — 純 sparkline 視覺
         display: false,
         grid: { display: false },
         beginAtZero: false,
-        // 留一點 padding 不讓線貼底
-        suggestedMin: Math.min(...values) - (Math.max(...values) - Math.min(...values)) * 0.15,
-        suggestedMax: Math.max(...values) + (Math.max(...values) - Math.min(...values)) * 0.1,
-      },
-    },
-    elements: {
-      line: {
-        // CSS filter 透過 Chart.js 不直接支援,改用 shadowBlur(在 plugin 加)
+        suggestedMin:
+          Math.min(...values) -
+          (Math.max(...values) - Math.min(...values)) * 0.15,
+        suggestedMax:
+          Math.max(...values) +
+          (Math.max(...values) - Math.min(...values)) * 0.1,
       },
     },
   };
 
+  // 用 amount/100k 級別自適應字體,避免大數字破版
+  const fontClass = (amount: number) => {
+    const digits = Math.abs(Math.round(amount)).toString().length;
+    if (digits >= 9) return 'text-base'; // > 1 億
+    if (digits >= 8) return 'text-lg'; // > 1000 萬
+    return 'text-xl'; // 1000 萬以下
+  };
+
   return (
     <div className="rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-4">
-      {/* 上方數字概覽 */}
-      <div className="flex items-end justify-between mb-3">
-        <div>
-          <div className="text-[11px] text-muted-foreground tracking-wide uppercase">
+      {/* 上方數字概覽(自適應字體大小) */}
+      <div className="flex items-end justify-between gap-3 mb-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] text-muted-foreground tracking-wide uppercase">
             累計投入
           </div>
-          <div className="text-2xl font-display font-semibold tabular-nums tracking-tight mt-0.5">
+          <div
+            className={cn(
+              'font-display font-semibold tabular-nums tracking-tight mt-0.5 truncate',
+              fontClass(series.totalCost),
+            )}
+          >
             {privacy ? '••••••' : formatTwd(series.totalCost)}
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-[11px] text-muted-foreground tracking-wide uppercase">
+        <div className="min-w-0 flex-1 text-right">
+          <div className="text-[10px] text-muted-foreground tracking-wide uppercase">
             目前市值
           </div>
           <div
             className={cn(
-              'text-2xl font-display font-semibold tabular-nums tracking-tight mt-0.5',
+              'font-display font-semibold tabular-nums tracking-tight mt-0.5 truncate',
+              fontClass(series.currentMarketValue),
               positive ? 'text-up' : 'text-down',
             )}
           >
@@ -217,11 +244,10 @@ export function AssetGrowthChart({ enriched, privacy, height = 140 }: Props) {
         </div>
       </div>
 
-      {/* Chart.js 容器:加 drop-shadow 讓線條發 teal 光 */}
       <div
         style={{
           height,
-          filter: 'drop-shadow(0 0 6px oklch(0.78 0.18 210 / 0.4))',
+          filter: `drop-shadow(0 0 6px ${accentBrandAlpha(0.3)})`,
         }}
       >
         <Line data={data} options={options} />

@@ -31,6 +31,13 @@ import { simulate } from '@/lib/calc';
 import { defaultConfig } from '@/lib/config';
 import { formatTwd } from '@/lib/format';
 import type { Scenario } from '@/lib/types';
+import {
+  ACCENT_BRAND,
+  accentBrandAlpha,
+  FOREGROUND,
+  MUTED,
+  POPOVER_BG,
+} from '@/lib/colors';
 
 ChartJS.register(
   CategoryScale,
@@ -68,19 +75,28 @@ export function SimulatePage() {
       {
         label: '名目總資產',
         data: result.map((r) => r.totalAssetTwd),
-        borderColor: '#dc2626',
-        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+        borderColor: ACCENT_BRAND,
+        backgroundColor: accentBrandAlpha(0.18),
         fill: true,
-        tension: 0.3,
+        tension: 0.4,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointBackgroundColor: 'oklch(0.205 0 0)',
+        pointBorderColor: ACCENT_BRAND,
+        pointBorderWidth: 2,
       },
       {
         label: '實質購買力(折通膨)',
         data: result.map((r) => r.totalRealTwd),
-        borderColor: '#737373',
+        borderColor: MUTED,
         borderDash: [4, 4],
         backgroundColor: 'transparent',
         fill: false,
-        tension: 0.3,
+        tension: 0.4,
+        borderWidth: 1.5,
+        pointRadius: 0,
+        pointHoverRadius: 4,
       },
     ],
   };
@@ -132,7 +148,10 @@ export function SimulatePage() {
         </div>
       </section>
 
-      <section className="h-64">
+      <section
+        className="h-64 rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-3"
+        style={{ filter: `drop-shadow(0 0 6px ${accentBrandAlpha(0.25)})` }}
+      >
         <Line
           data={data}
           options={{
@@ -141,21 +160,50 @@ export function SimulatePage() {
             interaction: { mode: 'index', intersect: false },
             scales: {
               y: {
+                grid: { color: 'oklch(1 0 0 / 0.06)' },
+                border: { display: false },
                 ticks: {
                   callback: (v) => formatTwd(Number(v)),
-                  font: { size: 10 },
+                  font: { size: 10, family: 'var(--font-display)' },
+                  color: MUTED,
                 },
               },
-              x: { ticks: { font: { size: 10 } } },
+              x: {
+                grid: { display: false },
+                border: { display: false },
+                ticks: {
+                  font: { size: 10, family: 'var(--font-display)' },
+                  color: MUTED,
+                },
+              },
             },
             plugins: {
               tooltip: {
+                backgroundColor: POPOVER_BG,
+                titleColor: ACCENT_BRAND,
+                bodyColor: FOREGROUND,
+                borderColor: accentBrandAlpha(0.4),
+                borderWidth: 1,
+                padding: 8,
+                cornerRadius: 6,
+                bodyFont: {
+                  size: 11,
+                  family: 'var(--font-display)',
+                },
                 callbacks: {
                   label: (ctx: TooltipItem<'line'>) =>
                     `${ctx.dataset.label}: ${formatTwd(ctx.parsed.y ?? 0)}`,
                 },
               },
-              legend: { labels: { font: { size: 11 } } },
+              legend: {
+                labels: {
+                  font: { size: 11, family: 'var(--font-body)' },
+                  color: FOREGROUND,
+                  boxWidth: 12,
+                  boxHeight: 2,
+                  padding: 12,
+                },
+              },
             },
           }}
         />
