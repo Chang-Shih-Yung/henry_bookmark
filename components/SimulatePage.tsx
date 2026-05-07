@@ -1,8 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
 import {
   CategoryScale,
   Chart as ChartJS,
@@ -15,7 +13,6 @@ import {
   type TooltipItem,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -113,12 +110,8 @@ export function SimulatePage() {
 
   return (
     <main className="mx-auto w-full max-w-2xl p-4 pb-24 space-y-6">
-      <header className="flex items-center gap-2">
-        <Link href="/">
-          <Button variant="ghost" size="icon" aria-label="返回">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
+      {/* 試算是底部 BottomNav 的一個 tab,沒有「上一頁」可返回 — 拿掉左上 ArrowLeft */}
+      <header className="pt-2">
         <h1 className="text-lg font-semibold tracking-tight font-display">
           長期試算 · 10 年
         </h1>
