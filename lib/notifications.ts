@@ -174,6 +174,11 @@ export type Device = {
   host: string;
   hash: string;
   endpoint: string;
+  /** UA 摘要,例:"iPhone · Safari 17",舊資料沒 UA 時 undefined */
+  label?: string;
+  userAgent?: string;
+  /** 訂閱時間 ms,舊資料沒這欄時 undefined */
+  subscribedAt?: number;
 };
 export async function fetchDevices(): Promise<Device[]> {
   try {

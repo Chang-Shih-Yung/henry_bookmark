@@ -67,12 +67,16 @@ export function PushReminderSettings() {
   const [iosNotPwa, setIosNotPwa] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [currentEndpoint, setCurrentEndpoint] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const refreshDevices = async () => {
     const list = await fetchDevices();
     setDevices(list);
+    // 同步抓本機 subscription endpoint 用來標「本機」badge
+    const sub = await getCurrentSubscription();
+    setCurrentEndpoint(sub?.endpoint ?? null);
   };
   const [day, setDay] = useState(6);
   const [hour, setHour] = useState(12);
@@ -288,41 +292,59 @@ export function PushReminderSettings() {
             </span>
           </div>
           {devices.length > 0 && (
-            <div className="mt-1.5 pl-3 space-y-1">
-              {devices.map((d, i) => (
-                <div
-                  key={d.hash || i}
-                  className="flex items-center justify-between gap-2"
-                >
-                  <span className="text-muted-foreground/80 truncate">
-                    {i + 1}. {d.provider}{' '}
-                    <span className="text-muted-foreground/50">
-                      …{d.hash}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (!confirm(`刪除這台 ${d.provider} 裝置的訂閱?`))
-                        return;
-                      setBusy(true);
-                      const res = await deleteDevice(d.endpoint);
-                      if (res.ok) {
-                        toast.success('已刪除該裝置訂閱');
-                        await refreshDevices();
-                      } else {
-                        toast.error('刪除失敗');
-                      }
-                      setBusy(false);
-                    }}
-                    disabled={busy}
-                    aria-label="刪除這台裝置"
-                    className="shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+            <div className="mt-1.5 pl-3 space-y-1.5">
+              {devices.map((d, i) => {
+                const isCurrent = currentEndpoint === d.endpoint;
+                const dateStr = d.subscribedAt
+                  ? new Date(d.subscribedAt).toLocaleString('zh-TW', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : null;
+                return (
+                  <div
+                    key={d.hash || i}
+                    className="flex items-start justify-between gap-2"
                   >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0 flex-1">
+                      <div className="text-muted-foreground/90">
+                        {i + 1}. {d.label ?? d.provider}
+                        {isCurrent && (
+                          <span className="ml-1.5 inline-flex items-center px-1.5 py-px rounded bg-accent-brand/30 text-foreground text-[9px] font-medium">
+                            本機
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-muted-foreground/50 text-[9px]">
+                        {dateStr ? `訂閱於 ${dateStr} · ` : ''}…{d.hash}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const label = d.label ?? d.provider;
+                        if (!confirm(`刪除「${label}」這台的訂閱?`)) return;
+                        setBusy(true);
+                        const res = await deleteDevice(d.endpoint);
+                        if (res.ok) {
+                          toast.success('已刪除該裝置訂閱');
+                          await refreshDevices();
+                        } else {
+                          toast.error('刪除失敗');
+                        }
+                        setBusy(false);
+                      }}
+                      disabled={busy}
+                      aria-label="刪除這台裝置"
+                      className="shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-muted-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-30"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

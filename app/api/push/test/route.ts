@@ -52,9 +52,17 @@ export async function POST() {
   const errors: Array<{ statusCode: number; message?: string }> = [];
 
   for (const raw of subs) {
-    // Upstash 自動 deserialize → raw 可能已經是 object,不能再 JSON.parse。用 helper 處理兩種情況
-    const sub = parseRedisJson<WPSubscription>(raw);
-    if (!sub) {
+    // Upstash 自動 deserialize → raw 可能已經是 object,不能再 JSON.parse
+    // 也兼容 wrapped 格式 { subscription, userAgent, subscribedAt }
+    const parsed = parseRedisJson<
+      WPSubscription | { subscription: WPSubscription }
+    >(raw);
+    const sub: WPSubscription | null = parsed
+      ? 'subscription' in parsed
+        ? parsed.subscription
+        : (parsed as WPSubscription)
+      : null;
+    if (!sub?.endpoint) {
       console.warn('[push/test] failed to parse sub entry, skipping');
       continue;
     }

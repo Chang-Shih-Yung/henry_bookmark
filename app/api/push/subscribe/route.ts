@@ -52,9 +52,29 @@ export async function POST(req: Request) {
     new URL(parsed.data.subscription.endpoint).host,
   );
 
+  // 包成 { subscription, userAgent, subscribedAt } 給後續 listing 顯示「哪一台」用
+  // 同 endpoint 重複 POST 會多進 set(因為 JSON 字串多了 timestamp 不同) →
+  // 先掃 set 移除同 endpoint 的舊 entry,再 sadd 新的(deduplicate by endpoint)
   const subKey = pushSubscriptionsKey(email);
-  // sadd 把這個 subscription 加到 user 的 set(同 endpoint 不會重複)
-  await redis.sadd(subKey, JSON.stringify(parsed.data.subscription));
+  const ua = req.headers.get('user-agent') ?? '';
+  const newEntry = {
+    subscription: parsed.data.subscription,
+    userAgent: ua,
+    subscribedAt: Date.now(),
+  };
+  // 清掉同 endpoint 的舊 entry
+  const existingAll = await redis.smembers(subKey);
+  for (const item of existingAll) {
+    const parsed2 = parseRedisJson<{
+      endpoint?: string;
+      subscription?: { endpoint?: string };
+    }>(item);
+    const itemEndpoint = parsed2?.endpoint ?? parsed2?.subscription?.endpoint;
+    if (itemEndpoint === parsed.data.subscription.endpoint) {
+      await redis.srem(subKey, item);
+    }
+  }
+  await redis.sadd(subKey, JSON.stringify(newEntry));
 
   // 寫入 / 更新 reminder config
   const cfgKey = reminderConfigKey(email);
@@ -87,11 +107,15 @@ export async function DELETE(req: Request) {
 
   if (endpoint) {
     // 移除單一裝置 — 從 set 找出 endpoint 對應的 entry 並刪掉
-    // Upstash 自動 deserialize,smembers 回的可能是 object 或 string,用 helper 兼容
+    // 兼容兩種格式:bare { endpoint, ... } 或 wrapped { subscription: { endpoint, ... } }
     const all = await redis.smembers(subKey);
     for (const item of all) {
-      const parsed = parseRedisJson<{ endpoint?: string }>(item);
-      if (parsed?.endpoint === endpoint) {
+      const parsed = parseRedisJson<{
+        endpoint?: string;
+        subscription?: { endpoint?: string };
+      }>(item);
+      const itemEndpoint = parsed?.endpoint ?? parsed?.subscription?.endpoint;
+      if (itemEndpoint === endpoint) {
         await redis.srem(subKey, item);
       }
     }

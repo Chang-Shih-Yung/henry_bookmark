@@ -59,8 +59,16 @@ export async function GET(req: Request) {
     // 取出該 user 所有訂閱裝置
     const subs = await redis.smembers(pushSubscriptionsKey(email));
     for (const raw of subs) {
-      const sub = parseRedisJson<WPSubscription>(raw);
-      if (!sub) continue;
+      // 兼容 bare WPSubscription / wrapped { subscription, userAgent, subscribedAt }
+      const parsed = parseRedisJson<
+        WPSubscription | { subscription: WPSubscription }
+      >(raw);
+      const sub: WPSubscription | null = parsed
+        ? 'subscription' in parsed
+          ? parsed.subscription
+          : (parsed as WPSubscription)
+        : null;
+      if (!sub?.endpoint) continue;
       const result = await sendPushToSubscription(sub, {
         title: cfg.title,
         body: cfg.body,
