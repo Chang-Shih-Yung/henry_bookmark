@@ -114,7 +114,10 @@ export function HoldingDetailSheet({
     <Drawer
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      // vaul 內建 drag-to-dismiss + spring transition,直接接管手勢
+      // 關閉背景 scale-down(預設 true 會造成內部 carousel scroll 抖動)
+      shouldScaleBackground={false}
+      // 控制拖動關閉的 threshold
+      closeThreshold={0.25}
     >
       <DrawerContent className="!h-[90vh] p-0 flex flex-col gap-0 bg-popover border-t border-white/10">
         {/* DrawerTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
@@ -216,7 +219,7 @@ export function HoldingDetailSheet({
           <Button
             size="lg"
             onClick={onAddDepositClick}
-            className="w-full gap-1.5 shadow-[0_0_24px_var(--accent-brand)]"
+            className="w-full gap-1.5"
           >
             <Plus className="h-4 w-4 shrink-0" />
             <span className="truncate">新增一筆存款</span>

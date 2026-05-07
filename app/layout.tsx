@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from 'next';
-import { Space_Grotesk, JetBrains_Mono } from 'next/font/google';
+import { Space_Grotesk, IBM_Plex_Mono } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { Providers } from '@/components/Providers';
 import './globals.css';
 
-// Space Grotesk + JetBrains Mono — 金融科技感最強的開源組合
-// Space Grotesk:幾何 grotesque,Stripe / Vercel analytics dashboard 風,大字超有科技感
-// JetBrains Mono:monospace,數字粗細對齊感極佳(原本給工程師看 code 用,金融數字也完美)
+// Space Grotesk + IBM Plex Mono — 金融科技感最強的開源組合
+// Space Grotesk:幾何 grotesque,Stripe / Vercel analytics 風
+// IBM Plex Mono:IBM 設計系統字體,沒 slashed zero(0 中間沒斜線),專業金融感
 // 中文 fallback PingFang TC(iOS 內建最好的中文字)
-const fontDisplay = JetBrains_Mono({
+const fontDisplay = IBM_Plex_Mono({
   variable: '--font-display',
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],

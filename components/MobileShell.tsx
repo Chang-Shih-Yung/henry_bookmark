@@ -64,22 +64,16 @@ function BottomNav({ active }: { active: TabKey }) {
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {/* active icon 加 accent-brand 光暈 */}
-              <div className="relative">
-                {isActive && (
-                  <span
-                    aria-hidden
-                    className="absolute -inset-2 rounded-full bg-accent-brand/20 blur-md"
-                  />
+              {/* active = 純白色 icon + 文字加粗;inactive = 深灰。沒有光暈 */}
+              <t.Icon
+                className={cn(
+                  'h-5 w-5',
+                  isActive ? 'text-foreground' : 'text-muted-foreground',
                 )}
-                <t.Icon
-                  className={cn(
-                    'h-5 w-5 relative',
-                    isActive && 'text-accent-brand',
-                  )}
-                />
-              </div>
-              <span className={cn(isActive && 'font-medium')}>{t.label}</span>
+              />
+              <span className={cn(isActive && 'font-medium text-foreground')}>
+                {t.label}
+              </span>
             </Link>
           );
         })}

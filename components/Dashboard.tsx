@@ -226,7 +226,7 @@ export function Dashboard() {
             <MoneyDisplay
               twd={summary.totalAssetTwd}
               hidden={privacy}
-              className="text-5xl font-bold font-display tracking-tight block text-foreground [text-shadow:0_0_32px_var(--accent-brand)]"
+              className="text-5xl font-bold font-display tracking-tight block text-foreground"
             />
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm tabular-nums">
               <span
@@ -310,7 +310,7 @@ export function Dashboard() {
                 {active && (
                   <span
                     aria-hidden
-                    className="absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full bg-accent-brand shadow-[0_0_8px_var(--accent-brand)]"
+                    className="absolute left-0 right-0 -bottom-0.5 h-[2px] rounded-full bg-foreground"
                   />
                 )}
               </button>

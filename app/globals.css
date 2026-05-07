@@ -161,28 +161,28 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
+    /* 頂部一大塊藍紫漸層,模仿參考圖風格:
+       - 頂部 50% 是 violet 主色帶
+       - 中段微微淡到 indigo
+       - 底部 30% fade to 純黑 */
     background:
       radial-gradient(
-        circle at 0% 0%,
-        oklch(0.6 0.2 210 / 0.32),
-        transparent 50%
+        ellipse 130% 70% at 50% 0%,
+        oklch(0.55 0.22 280 / 0.5),
+        oklch(0.4 0.2 270 / 0.25) 35%,
+        transparent 65%
       ),
       radial-gradient(
-        circle at 100% 0%,
-        oklch(0.5 0.22 290 / 0.26),
-        transparent 55%
+        ellipse 80% 50% at 80% 30%,
+        oklch(0.5 0.22 300 / 0.3),
+        transparent 60%
       ),
       radial-gradient(
-        circle at 100% 100%,
-        oklch(0.55 0.2 25 / 0.18),
-        transparent 55%
-      ),
-      radial-gradient(
-        circle at 0% 100%,
-        oklch(0.5 0.18 195 / 0.22),
-        transparent 55%
+        ellipse 60% 40% at 20% 60%,
+        oklch(0.45 0.2 260 / 0.2),
+        transparent 60%
       );
-    filter: blur(85px);
+    filter: blur(60px);
     /* 確保 ambient 不會吃 backdrop-blur 元素的效果 */
     will-change: transform;
   }
