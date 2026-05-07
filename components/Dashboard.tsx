@@ -37,6 +37,7 @@ import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
 import { BuyDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
 import { AssetGrowthChart } from '@/components/AssetGrowthChart';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -190,35 +191,29 @@ export function Dashboard() {
               )}
             </button>
           </div>
-          {/* 文字 / 圖表 切換 */}
-          <div className="inline-flex rounded-full bg-card/40 backdrop-blur-sm border border-white/10 p-0.5">
-            <button
-              type="button"
-              onClick={() => setHeroView('text')}
-              className={cn(
-                'h-7 w-7 rounded-full inline-flex items-center justify-center transition-colors',
-                heroView === 'text'
-                  ? 'bg-accent-brand/25 text-accent-brand'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+          {/* 文字 / 圖表 切換 — shadcn ToggleGroup */}
+          <ToggleGroup
+            value={[heroView]}
+            onValueChange={(v) => {
+              if (v.length > 0) setHeroView(v[0] as 'text' | 'chart');
+            }}
+            className="rounded-full"
+          >
+            <ToggleGroupItem
+              value="text"
               aria-label="文字模式"
+              className="rounded-full w-8 h-7"
             >
               <Hash className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setHeroView('chart')}
-              className={cn(
-                'h-7 w-7 rounded-full inline-flex items-center justify-center transition-colors',
-                heroView === 'chart'
-                  ? 'bg-accent-brand/25 text-accent-brand'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="chart"
               aria-label="圖表模式"
+              className="rounded-full w-8 h-7"
             >
               <TrendingUp className="h-3.5 w-3.5" />
-            </button>
-          </div>
+            </ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
         {heroView === 'text' ? (

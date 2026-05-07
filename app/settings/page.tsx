@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { MobileShell } from '@/components/MobileShell';
 import { PushReminderSettings } from '@/components/PushReminderSettings';
+import { RestoreTw50Button } from '@/components/RestoreTw50Button';
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -35,6 +36,10 @@ export default async function SettingsPage() {
             提醒
           </h2>
           <PushReminderSettings />
+        </section>
+
+        <section className="space-y-2">
+          <RestoreTw50Button />
         </section>
 
 

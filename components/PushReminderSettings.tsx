@@ -5,6 +5,8 @@ import { Bell, BellOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
   fetchReminderConfig,
   getCurrentSubscription,
@@ -68,10 +70,10 @@ export function PushReminderSettings() {
     })();
   }, []);
 
-  const onToggle = async () => {
+  const onToggle = async (checked: boolean) => {
     setBusy(true);
     try {
-      if (enabled) {
+      if (!checked) {
         const res = await unsubscribePush();
         if (res.ok) {
           setEnabled(false);
@@ -146,22 +148,16 @@ export function PushReminderSettings() {
             iPhone 必須先把網站「加入主畫面」才會收到。
           </p>
         </div>
-        <Button
-          type="button"
-          variant={enabled ? 'outline' : 'default'}
-          size="sm"
-          onClick={onToggle}
-          disabled={busy}
-          className="shrink-0"
-        >
-          {busy ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : enabled ? (
-            '停用'
-          ) : (
-            '啟用'
-          )}
-        </Button>
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+        ) : (
+          <Switch
+            checked={enabled}
+            onCheckedChange={onToggle}
+            aria-label={enabled ? '停用提醒' : '啟用提醒'}
+            className="shrink-0"
+          />
+        )}
       </div>
 
       <div className="space-y-3 pt-2 border-t border-white/8">
@@ -192,41 +188,20 @@ export function PushReminderSettings() {
               幾點(台灣時間)
             </Label>
             <div className="flex gap-1.5 mt-1">
-              {/* 上午 / 下午 segmented control */}
-              <div className="inline-flex rounded-md border border-white/10 bg-card/40 backdrop-blur-sm p-0.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const h12 = hourToHour12(hour);
-                    setHour(hour12ToHour(h12, false));
-                    setDirty(true);
-                  }}
-                  className={cn(
-                    'px-2 h-8 text-xs rounded transition-colors',
-                    hour < 12
-                      ? 'bg-accent-brand/20 text-accent-brand font-medium'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  上午
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const h12 = hourToHour12(hour);
-                    setHour(hour12ToHour(h12, true));
-                    setDirty(true);
-                  }}
-                  className={cn(
-                    'px-2 h-8 text-xs rounded transition-colors',
-                    hour >= 12
-                      ? 'bg-accent-brand/20 text-accent-brand font-medium'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  下午
-                </button>
-              </div>
+              <ToggleGroup
+                value={[hour < 12 ? 'am' : 'pm']}
+                onValueChange={(v) => {
+                  if (v.length === 0) return; // 不允許全 deselect
+                  const isPM = v[0] === 'pm';
+                  const h12 = hourToHour12(hour);
+                  setHour(hour12ToHour(h12, isPM));
+                  setDirty(true);
+                }}
+                className="shrink-0"
+              >
+                <ToggleGroupItem value="am">上午</ToggleGroupItem>
+                <ToggleGroupItem value="pm">下午</ToggleGroupItem>
+              </ToggleGroup>
               <Input
                 type="number"
                 inputMode="numeric"
