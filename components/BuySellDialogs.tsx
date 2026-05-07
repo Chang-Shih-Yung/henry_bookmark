@@ -2,16 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  NestedDrawer,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FieldLabel } from '@/components/ui/field-label';
 import type { Holding } from '@/lib/types';
 import { applyBuy } from '@/lib/calc';
 import { formatTwd, formatUnits, formatUsd } from '@/lib/format';
@@ -142,19 +140,40 @@ export function BuyDialog({
     : formatTwd(currentCostTwd, 'full');
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>新增一筆存款 — {holding.displayName}</DialogTitle>
-          <DialogDescription>
-            從 app 抄「買完後」的累計總量、累計總額。系統幫你算這筆 delta。
-          </DialogDescription>
-        </DialogHeader>
+    <NestedDrawer open={open} onOpenChange={(o) => !o && onClose()}>
+      <DrawerContent
+        className={cn(
+          // 比 detail sheet 亮一咪咪(疊加 sheet 的層次感),只有上半部高度
+          '!h-auto max-h-[88vh] bg-popover',
+          // 加 1px 邊讓邊緣浮起,內部稍微加亮
+          'border-t border-white/15 shadow-[0_-12px_32px_rgba(0,0,0,0.4)]',
+        )}
+        style={{
+          // popover 預設 oklch(0.205 0 0),這裡加亮到 ~0.225,跟 detail sheet 拉開層次
+          backgroundColor: 'oklch(0.235 0 0)',
+        }}
+      >
+        {/* drag handle bar */}
+        <div className="h-11 flex items-center justify-center shrink-0">
+          <div className="h-1.5 w-12 rounded-full bg-foreground/25" />
+        </div>
 
-        <div className="space-y-4 py-2">
+        <div className="px-4 pb-4 overflow-y-auto">
+          <div className="text-center pb-3">
+            <DrawerTitle className="text-base font-medium">
+              新增一筆存款 — {holding.displayName}
+            </DrawerTitle>
+            <DrawerDescription className="text-xs text-muted-foreground mt-1">
+              從 app 抄「買完後」的累計總量、累計總額。系統幫你算這筆 delta。
+            </DrawerDescription>
+          </div>
+
+          <div className="space-y-4 py-2">
           {!isCash && (
             <div>
-              <Label htmlFor="buy-units">買後累計總數量</Label>
+              <FieldLabel htmlFor="buy-units" hint={unitTag}>
+                買後累計總數量
+              </FieldLabel>
               <Input
                 id="buy-units"
                 type="number"
@@ -186,10 +205,9 @@ export function BuyDialog({
           )}
 
           <div>
-            <Label htmlFor="buy-cost">
+            <FieldLabel htmlFor="buy-cost" hint={isUsdNative ? 'USD' : 'TWD'}>
               {isCash ? '存後累計餘額' : '買後累計總投入'}
-              {isUsdNative ? '(USD)' : '(TWD)'}
-            </Label>
+            </FieldLabel>
             <Input
               id="buy-cost"
               type="number"
@@ -238,10 +256,12 @@ export function BuyDialog({
 
           {!isCash && (
             <div>
-              <Label htmlFor="buy-avg">
-                成交均價(從 app 抄,選填)
-                {isUsdNative ? '(USD)' : '(TWD)'}
-              </Label>
+              <FieldLabel
+                htmlFor="buy-avg"
+                hint={`${isUsdNative ? 'USD' : 'TWD'} · 選填`}
+              >
+                成交均價
+              </FieldLabel>
               <Input
                 id="buy-avg"
                 type="number"
@@ -259,15 +279,19 @@ export function BuyDialog({
           )}
         </div>
 
-        <DialogFooter className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={handle} disabled={!canSubmit}>
-            確認
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <div
+            className="grid grid-cols-2 gap-2 pt-3"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <Button variant="outline" onClick={onClose}>
+              取消
+            </Button>
+            <Button onClick={handle} disabled={!canSubmit}>
+              確認
+            </Button>
+          </div>
+        </div>
+      </DrawerContent>
+    </NestedDrawer>
   );
 }

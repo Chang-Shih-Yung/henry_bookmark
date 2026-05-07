@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, AlertTriangle, Trash2 } from 'lucide-react';
+import { Plus, AlertTriangle, Trash2, Pencil } from 'lucide-react';
 import type { EnrichedHolding, Transaction } from '@/lib/types';
 import {
   formatTwd,
@@ -37,6 +37,8 @@ type Props = {
   onChangeCurrentId: (id: string) => void;
   /** 新增一筆存款 — 輸入「買後累計總量、累計總額」,系統算這筆 delta。 */
   onAddDepositClick: () => void;
+  /** 單獨編輯成交均價 */
+  onEditAvgClick: (id: string) => void;
   onDeleteClick: () => void;
 };
 
@@ -48,6 +50,7 @@ export function HoldingDetailSheet({
   onClose,
   onChangeCurrentId,
   onAddDepositClick,
+  onEditAvgClick,
   onDeleteClick,
 }: Props) {
   const { privacy } = usePrivacy();
@@ -118,9 +121,7 @@ export function HoldingDetailSheet({
       shouldScaleBackground={false}
       // 控制拖動關閉的 threshold
       closeThreshold={0.25}
-      // 重要:modal=false 讓上層 Dialog(BuyDialog)的 input / button 可以正常接受事件
-      // (vaul 預設 modal=true 會把外部 inert,但 Dialog portal 也在外部會被誤鎖)
-      modal={false}
+      // modal=true 鎖背景 scroll(BuyDialog 改用 NestedDrawer 後不再有 inert 衝突)
     >
       <DrawerContent className="!h-[90vh] p-0 flex flex-col gap-0 bg-popover border-t border-white/10">
         {/* DrawerTitle 給 a11y,視覺隱藏 — 真正的標題在每張 card 上 */}
@@ -161,6 +162,7 @@ export function HoldingDetailSheet({
                   holding={h}
                   usdTwd={usdTwd}
                   privacy={privacy}
+                  onEditAvgClick={() => onEditAvgClick(h.id)}
                 />
               </div>
             ))}
@@ -248,10 +250,12 @@ function HoldingHeaderCard({
   holding,
   usdTwd,
   privacy,
+  onEditAvgClick,
 }: {
   holding: EnrichedHolding;
   usdTwd: number | null | undefined;
   privacy: boolean;
+  onEditAvgClick: () => void;
 }) {
   const fxRate = usdTwd ?? 0;
   const isUsdNative = isUsdNativeType(holding.type);
@@ -377,8 +381,16 @@ function HoldingHeaderCard({
             </div>
           </div>
           <div className="text-center border-l border-white/10 px-2">
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-[11px] text-muted-foreground inline-flex items-center justify-center gap-1">
               成交均價 ({currencyTag})
+              <button
+                type="button"
+                onClick={onEditAvgClick}
+                aria-label="編輯成交均價"
+                className="inline-flex items-center justify-center h-5 w-5 rounded text-muted-foreground/60 hover:text-foreground hover:bg-accent/30 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+              </button>
             </div>
             <div className="text-lg font-semibold font-display tabular-nums mt-1">
               {avgStr}

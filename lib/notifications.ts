@@ -140,3 +140,20 @@ export async function fetchReminderConfig(): Promise<{
   if (!res.ok) return null;
   return res.json();
 }
+
+export async function sendTestPush(): Promise<{
+  ok: boolean;
+  sentCount?: number;
+  reason?: string;
+}> {
+  const res = await fetch('/api/push/test', { method: 'POST' });
+  if (!res.ok) {
+    try {
+      const data = await res.json();
+      return { ok: false, reason: data.reason ?? `Server ${res.status}` };
+    } catch {
+      return { ok: false, reason: `Server ${res.status}` };
+    }
+  }
+  return res.json();
+}

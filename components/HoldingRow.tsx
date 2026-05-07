@@ -90,7 +90,8 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
         'rounded-xl border border-white/10 bg-card/55 backdrop-blur-sm',
         'shadow-[0_2px_8px_rgba(0,0,0,0.15)]',
         'hover:bg-card/70 active:bg-card/80',
-        'touch-none', // dnd-kit 需要,避免 mobile touch 跟 drag 衝突
+        // 拖動時不要被 iOS 的 long-press 文字選取/長按選單干擾
+        'touch-none select-none [-webkit-user-select:none] [-webkit-touch-callout:none]',
       )}
     >
       <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />

@@ -14,6 +14,13 @@ function Drawer(props: React.ComponentProps<typeof DrawerPrimitive.Root>) {
   return <DrawerPrimitive.Root data-slot="drawer" {...props} />;
 }
 
+/** Nested Drawer — 疊加在另一個 Drawer 上的子抽屜(像 iOS 帳單疊新疊) */
+function NestedDrawer(
+  props: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>,
+) {
+  return <DrawerPrimitive.NestedRoot data-slot="nested-drawer" {...props} />;
+}
+
 function DrawerTrigger(
   props: React.ComponentProps<typeof DrawerPrimitive.Trigger>,
 ) {
@@ -128,6 +135,7 @@ function DrawerDescription({
 
 export {
   Drawer,
+  NestedDrawer,
   DrawerTrigger,
   DrawerClose,
   DrawerPortal,

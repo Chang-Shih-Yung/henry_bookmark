@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FieldLabel } from '@/components/ui/field-label';
 import type { AssetType, Holding } from '@/lib/types';
 
 const TYPE_DEFAULTS: Record<
@@ -118,7 +118,7 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
 
         <div className="space-y-3 py-2">
           <div>
-            <Label htmlFor="new-symbol">代號</Label>
+            <FieldLabel htmlFor="new-symbol">代號</FieldLabel>
             <Input
               id="new-symbol"
               value={symbol}
@@ -129,7 +129,7 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
             <p className="text-xs text-muted-foreground mt-1">{def.symbolHint}</p>
           </div>
           <div>
-            <Label htmlFor="new-name">顯示名稱</Label>
+            <FieldLabel htmlFor="new-name">顯示名稱</FieldLabel>
             <Input
               id="new-name"
               value={name}
@@ -139,7 +139,7 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="new-units">數量</Label>
+              <FieldLabel htmlFor="new-units">數量</FieldLabel>
               <Input
                 id="new-units"
                 type="number"
@@ -150,7 +150,7 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
               />
             </div>
             <div>
-              <Label htmlFor="new-cost">已投入(TWD)</Label>
+              <FieldLabel htmlFor="new-cost" hint="TWD">已投入</FieldLabel>
               <Input
                 id="new-cost"
                 type="number"
@@ -162,7 +162,9 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
             </div>
           </div>
           <div>
-            <Label htmlFor="new-auto">每月定期定額(TWD,選填)</Label>
+            <FieldLabel htmlFor="new-auto" hint="TWD · 選填">
+              每月定期定額
+            </FieldLabel>
             <Input
               id="new-auto"
               type="number"
@@ -175,10 +177,12 @@ export function NewHoldingDialog({ type, open, onClose, onConfirm }: Props) {
           </div>
           {(type === 'tw_stock' || type === 'us_stock' || type === 'crypto') && (
             <div>
-              <Label htmlFor="new-avg">
-                成交均價(從 app 抄,選填)
-                {isUsdNative ? '(USD)' : '(TWD)'}
-              </Label>
+              <FieldLabel
+                htmlFor="new-avg"
+                hint={`${isUsdNative ? 'USD' : 'TWD'} · 選填`}
+              >
+                成交均價
+              </FieldLabel>
               <Input
                 id="new-avg"
                 type="number"

@@ -36,6 +36,7 @@ import { HoldingRow } from '@/components/HoldingRow';
 import { HoldingDetailSheet } from '@/components/HoldingDetailSheet';
 import { BuyDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
+import { EditAvgPriceDialog } from '@/components/EditAvgPriceDialog';
 import { AssetGrowthChart } from '@/components/AssetGrowthChart';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
@@ -93,6 +94,7 @@ export function Dashboard() {
   const { privacy, toggle: togglePrivacy } = usePrivacy();
 
   const [buyTarget, setBuyTarget] = useState<Holding | null>(null);
+  const [editAvgTarget, setEditAvgTarget] = useState<Holding | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [newType, setNewType] = useState<AssetType | null>(null);
   const [tab, setTab] = useState<TabValue>('all');
@@ -438,11 +440,21 @@ export function Dashboard() {
         onAddDepositClick={() => {
           if (detailTarget) setBuyTarget(detailTarget);
         }}
+        onEditAvgClick={(id) => {
+          const target = enriched.find((h) => h.id === id);
+          if (target) setEditAvgTarget(target);
+        }}
         onDeleteClick={() => {
           if (detailTarget && deleteHolding(detailTarget.id)) {
             setDetailId(null);
           }
         }}
+      />
+      <EditAvgPriceDialog
+        holding={editAvgTarget}
+        open={!!editAvgTarget}
+        onClose={() => setEditAvgTarget(null)}
+        onConfirm={(next) => replaceHolding(next.id, next)}
       />
     </main>
   );
