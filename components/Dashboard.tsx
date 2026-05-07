@@ -302,12 +302,27 @@ export function Dashboard() {
           value={Math.min(summary.goalProgressPct * 100, 100)}
           className="h-2"
         />
-        <div className="text-xs text-muted-foreground tabular-nums">
-          {(summary.goalProgressPct * 100).toFixed(1)}% · 離{' '}
-          {maskMoney(formatTwd(defaultConfig.goalTwd), privacy)} 還差{' '}
-          <span className="text-foreground">
-            {maskMoney(formatTwd(remainingToGoal), privacy)}
-          </span>
+        {/* Goal progress 重排:百分比變主角(text-base + 高對比),目標金額退到副位
+            原本「2.1% · 離 $10M 還差 $9.7M」三個數字平鋪沒層次 */}
+        <div className="flex items-baseline justify-between gap-3 text-xs tabular-nums">
+          <div className="font-display">
+            <span className="text-base font-semibold text-foreground">
+              {(summary.goalProgressPct * 100).toFixed(1)}%
+            </span>
+            <span className="ml-1.5 text-[11px] text-muted-foreground">
+              達成
+            </span>
+          </div>
+          <div className="text-muted-foreground text-right">
+            還差{' '}
+            <span className="text-foreground font-medium">
+              {maskMoney(formatTwd(remainingToGoal), privacy)}
+            </span>
+            <span className="text-muted-foreground/50">
+              {' '}
+              / {maskMoney(formatTwd(defaultConfig.goalTwd), privacy)}
+            </span>
+          </div>
         </div>
       </section>
 
@@ -396,15 +411,33 @@ export function Dashboard() {
         )}
       </section>
 
-      {/* Footer info */}
-      <footer className="pt-6 text-center text-xs text-muted-foreground">
+      {/* Footer info — 雙行改 inline 一行 + mono 字體 + 24h tabular nums,視覺更乾淨 */}
+      <footer className="pt-6 text-center text-[10px] text-muted-foreground/70 font-display tabular-nums">
         {holdingsQ.data && (
-          <div>
-            最後修改:{new Date(holdingsQ.data.lastModified).toLocaleString('zh-TW')}
-          </div>
+          <span>
+            資料更新{' '}
+            {new Date(holdingsQ.data.lastModified).toLocaleString('zh-TW', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            })}
+          </span>
+        )}
+        {holdingsQ.data && pricesQ.data && (
+          <span className="mx-2 text-muted-foreground/40">·</span>
         )}
         {pricesQ.data && (
-          <div>即時價更新:{new Date(pricesQ.data.fetchedAt).toLocaleTimeString('zh-TW')}</div>
+          <span>
+            即時價{' '}
+            {new Date(pricesQ.data.fetchedAt).toLocaleTimeString('zh-TW', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            })}
+          </span>
         )}
       </footer>
 
