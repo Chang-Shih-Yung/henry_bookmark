@@ -505,7 +505,9 @@ function HoldingHeaderCard({
         </div>
       )}
 
-      <div className="space-y-3">
+      {/* privacy 切換時 key 強制 remount,排除 carousel / scroll snap 容器 child memo
+          抓舊 closure 的可能 */}
+      <div key={`hdr-money-${privacy ? 'm' : 's'}`} className="space-y-3">
         {showPnL && (
           <DetailRow
             label="參考損益"
@@ -516,7 +518,7 @@ function HoldingHeaderCard({
                   pnlPositive ? 'text-up' : 'text-down',
                 )}
               >
-                {maskMoney(pnlStr, privacy)}
+                {privacy ? '••••' : pnlStr}
                 <span className="text-xs ml-1 opacity-80">
                   ({formatPct(holding.unrealizedPnlPct)})
                 </span>
@@ -529,7 +531,7 @@ function HoldingHeaderCard({
             label="參考現值"
             value={
               <span className="text-2xl font-bold font-display tabular-nums">
-                {maskMoney(mktValueStr, privacy)}
+                {privacy ? '••••' : mktValueStr}
               </span>
             }
           />
@@ -538,7 +540,7 @@ function HoldingHeaderCard({
           label={isCash ? '餘額' : '成本'}
           value={
             <span className="font-medium tabular-nums">
-              {maskMoney(costStr, privacy)}
+              {privacy ? '••••' : costStr}
             </span>
           }
         />

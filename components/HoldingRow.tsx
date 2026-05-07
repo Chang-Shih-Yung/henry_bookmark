@@ -11,7 +11,7 @@ import {
   formatPrice,
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import { usePrivacy, maskMoney } from '@/lib/privacy';
+import { usePrivacy } from '@/lib/privacy';
 import {
   isUsdNativeType,
   formatPriceForDisplay,
@@ -125,10 +125,14 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
         </div>
       </div>
 
-      {/* Market value + PnL */}
+      {/* Market value + PnL — privacy 切換時用 key 強制 remount,
+          排除 dnd-kit / SortableContext 任何 child memo 抓到舊 closure 的可能 */}
       <div className="text-right shrink-0">
-        <div className="text-sm font-semibold tabular-nums">
-          {maskMoney(formatTwd(holding.marketValueTwd), privacy)}
+        <div
+          key={`mv-${privacy ? 'm' : 's'}`}
+          className="text-sm font-semibold tabular-nums"
+        >
+          {privacy ? '••••' : formatTwd(holding.marketValueTwd)}
         </div>
         <div className="text-xs tabular-nums leading-tight">
           {holding.costBasisTwd === 0 ? (
