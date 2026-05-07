@@ -21,10 +21,7 @@ import {
 } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { usePrivacy, maskMoney } from '@/lib/privacy';
-import {
-  isUsdNativeType,
-  formatPriceForDisplay,
-} from '@/components/HoldingEditSheet';
+import { isUsdNativeType } from '@/lib/holding-helpers';
 import {
   useHoldings,
   usePrices,
@@ -421,9 +418,6 @@ function HoldingHeaderCard({
         : holding.currentPriceTwd;
   const priceStr =
     priceVal === null ? '—' : priceVal.toLocaleString('en-US', numFmtOptions);
-
-  void formatPrice;
-  void formatPriceForDisplay;
 
   const pnlPositive = holding.unrealizedPnlTwd >= 0;
   const showPnL = stockOrCrypto && holding.costBasisTwd > 0;

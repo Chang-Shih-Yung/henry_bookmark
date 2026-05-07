@@ -377,7 +377,7 @@ export function Dashboard() {
         {tab === 'all' && summary.totalAssetTwd > 0 && (
           <div className="rounded-2xl border border-white/10 bg-card/40 backdrop-blur-xl p-4">
             <h2 className="text-xs text-muted-foreground mb-2">資產分布</h2>
-            <AllocationPie summary={summary} />
+            <AllocationPie summary={summary} privacy={privacy} />
           </div>
         )}
         <TabSummary items={filteredEnriched} privacy={privacy} />

@@ -15,7 +15,7 @@ import { usePrivacy, maskMoney } from '@/lib/privacy';
 import {
   isUsdNativeType,
   formatPriceForDisplay,
-} from '@/components/HoldingEditSheet';
+} from '@/lib/holding-helpers';
 
 type Props = {
   holding: EnrichedHolding;

@@ -10,6 +10,7 @@ import {
 import type { PortfolioSummary } from '@/lib/types';
 import { formatTwd } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { maskMoney } from '@/lib/privacy';
 import {
   accentBrandAlpha,
   ACCENT_BRAND,
@@ -38,7 +39,14 @@ const TYPE_COLORS: Record<string, string> = {
   trust: 'oklch(0.708 0 0)',           // muted neutral(信託沒市場色)
 };
 
-export function AllocationPie({ summary }: { summary: PortfolioSummary }) {
+export function AllocationPie({
+  summary,
+  privacy = false,
+}: {
+  summary: PortfolioSummary;
+  /** 跟 hero 區眼睛 toggle 同步:打開時中央金額顯示 ••• */
+  privacy?: boolean;
+}) {
   const entries = Object.entries(summary.byType).filter(
     ([, v]) => v.value > 0,
   );
@@ -95,7 +103,8 @@ export function AllocationPie({ summary }: { summary: PortfolioSummary }) {
                   label: (ctx: TooltipItem<'doughnut'>) => {
                     const value = ctx.parsed;
                     const pct = ((value / summary.totalAssetTwd) * 100).toFixed(1);
-                    return `${ctx.label}: ${formatTwd(value)} (${pct}%)`;
+                    const amount = maskMoney(formatTwd(value), privacy);
+                    return `${ctx.label}: ${amount} (${pct}%)`;
                   },
                 },
               },
@@ -117,7 +126,7 @@ export function AllocationPie({ summary }: { summary: PortfolioSummary }) {
             總資產
           </div>
           <div className="text-base font-display font-semibold tabular-nums tracking-tight mt-0.5">
-            {formatTwd(summary.totalAssetTwd)}
+            {maskMoney(formatTwd(summary.totalAssetTwd), privacy)}
           </div>
         </div>
       </div>
