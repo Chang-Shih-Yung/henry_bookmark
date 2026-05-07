@@ -38,6 +38,19 @@ import { BuyDialog } from '@/components/BuySellDialogs';
 import { NewHoldingDialog } from '@/components/NewHoldingDialog';
 import { AssetGrowthChart } from '@/components/AssetGrowthChart';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import {
+  DndContext,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { formatPct, formatTwd, formatChange } from '@/lib/format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -106,6 +119,32 @@ export function Dashboard() {
     () => enriched.filter((h) => tabMatches(tab, h.type)),
     [enriched, tab],
   );
+
+  // dnd-kit sensors — 長按 200ms 觸發拖動,放開內保留點擊行為(進 detail)
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !holdingsQ.data) return;
+    // 在 全 holdings 順序中找到 from / to,移動後寫回
+    const items = holdingsQ.data.items;
+    const oldIdx = items.findIndex((h) => h.id === active.id);
+    const newIdx = items.findIndex((h) => h.id === over.id);
+    if (oldIdx < 0 || newIdx < 0) return;
+    const next = {
+      ...holdingsQ.data,
+      items: arrayMove(items, oldIdx, newIdx),
+      lastModified: new Date().toISOString(),
+    };
+    update(next);
+  };
 
   const remainingToGoal = Math.max(
     defaultConfig.goalTwd - summary.totalAssetTwd,
@@ -336,16 +375,23 @@ export function Dashboard() {
               : '這個分類還沒有資產。'}
           </div>
         ) : (
-          <div className="space-y-2">
-            {filteredEnriched.map((h) => (
-              <HoldingRow
-                key={h.id}
-                holding={h}
-                usdTwd={pricesQ.data?.usdTwd}
-                onCardClick={() => setDetailId(h.id)}
-              />
-            ))}
-          </div>
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={filteredEnriched.map((h) => h.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {filteredEnriched.map((h) => (
+                  <HoldingRow
+                    key={h.id}
+                    holding={h}
+                    usdTwd={pricesQ.data?.usdTwd}
+                    onCardClick={() => setDetailId(h.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
         {tab !== 'all' && (
           <NewButtons tab={tab} onNew={(type) => setNewType(type)} />

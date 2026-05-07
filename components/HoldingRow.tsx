@@ -1,7 +1,9 @@
 'use client';
 
-import { AlertTriangle, ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronRight, GripVertical } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { EnrichedHolding } from '@/lib/types';
 import {
   formatTwd,
@@ -24,6 +26,22 @@ type Props = {
 
 export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
   const { privacy } = usePrivacy();
+
+  // dnd-kit sortable hook — 長按 200ms 觸發拖動,放開 commit 順序
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: holding.id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.6 : 1,
+  };
 
   const isUsdNative = isUsdNativeType(holding.type);
   const fxRate = usdTwd ?? 0;
@@ -54,17 +72,28 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
   void _avg; // 保留變數但 row 不渲染,讓 detail sheet 顯示
 
   return (
-    <button
-      type="button"
+    <div
+      ref={setNodeRef}
+      style={style}
       onClick={onCardClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onCardClick();
+        }
+      }}
+      {...attributes}
+      {...listeners}
       className={cn(
-        'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors',
+        'w-full flex items-center gap-3 px-3 py-3 text-left transition-colors cursor-pointer',
         // 粒粒分明:每張 row 自己一張卡,半透明 + backdrop blur 讓 ambient 漸層滲透
         'rounded-xl border border-white/10 bg-card/55 backdrop-blur-sm',
         'shadow-[0_2px_8px_rgba(0,0,0,0.15)]',
         'hover:bg-card/70 active:bg-card/80',
+        'touch-none', // dnd-kit 需要,避免 mobile touch 跟 drag 衝突
       )}
     >
+      <GripVertical className="h-4 w-4 text-muted-foreground/30 shrink-0" />
       {/* Name + symbol/price */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -111,7 +140,7 @@ export function HoldingRow({ holding, usdTwd, onCardClick }: Props) {
       </div>
 
       <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
-    </button>
+    </div>
   );
 }
 
