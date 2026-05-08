@@ -1,26 +1,28 @@
 'use client';
 
 /**
- * EggHatchScene — 蛋裂開 → 第一隻小精靈跳出來(Phase 2 中循環片段)。
+ * EggHatchScene — 蛋裂開 → 第一隻小精靈跳出來(Phase 2 動畫)。
  *
  * 觸發時機:server `applyMonthlyTrigger` 回 newPikmin !== null
- *           → useMonthlyTrigger() hook 偵測到 → IslandShell 套用此 component
+ *           → IslandShell 套用此 component
  *
- * 動畫節拍(~3 秒,GDD §22 medium duration):
- *   T0 (0-300ms)   蛋抖動(spring shake)
- *   T1 (300-700ms) 蛋裂成兩半(scale 0 + opacity)
- *   T2 (700-1200ms) 小精靈從原位置 spring 跳出來
- *   T3 (1200-2500ms) 文字「[顏色] 小精靈來了!」淡入
- *   T4 (2500ms+)   onComplete callback,IslandShell 切到正常顯示
+ * 動畫節拍(~1.5 秒,純視覺,沒文字):
+ *   T0 (0-300ms)   蛋震動(spring shake)
+ *   T1 (300-1000ms) 蛋裂、消失
+ *   T2 (700-1500ms) 小精靈從原位置 spring 跳出來
+ *   T3 (1500ms)    onComplete → IslandShell 接力 WelcomeCard 做儀式 acknowledge
  *
- * Reduced motion fallback:跳過所有動畫,直接顯示完成狀態 + 文字。
+ * Reduced motion fallback:跳過所有動畫,即刻 onComplete(讓 WelcomeCard 接手)。
+ *
+ * 設計重點:這個 component **只負責動畫**。儀式感(歡迎文字 + acknowledge button)
+ * 由 WelcomeCard 接力。分開後 user 看完動畫不會被自動 dismissed,卡片永遠在,
+ * 切走再回來也還在,直到按「好」才消失。
  */
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect } from 'react';
-import { ISLAND_DURATION, ISLAND_EASE, ISLAND_SPRING } from '@/lib/animations';
+import { ISLAND_EASE, ISLAND_SPRING } from '@/lib/animations';
 import type { Pikmin } from '@/lib/island-types';
-import { pikminHatchedGreeting } from '@/lib/island-content';
 
 const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
   green: 'var(--pikmin-green)',
@@ -32,47 +34,34 @@ const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
 
 type Props = {
   pikmin: Pikmin;
-  tribeName: string;
-  /** 動畫播完(或 reduced-motion 即刻)觸發,IslandShell 用來切回正常顯示 */
+  /** 動畫播完(或 reduced-motion 即刻)觸發,讓 IslandShell 切換成 WelcomeCard 階段 */
   onComplete?: () => void;
 };
 
-export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
+export function EggHatchScene({ pikmin, onComplete }: Props) {
   const reducedMotion = useReducedMotion();
 
-  // Reduced motion / 動畫播完 → 自動 onComplete
+  // 動畫播完 → onComplete(reduced motion 立即,正常 1500ms)
   useEffect(() => {
-    const totalDuration = reducedMotion ? 800 : 3000;
+    const duration = reducedMotion ? 0 : 1500;
     const t = window.setTimeout(() => {
       onComplete?.();
-    }, totalDuration);
+    }, duration);
     return () => window.clearTimeout(t);
   }, [reducedMotion, onComplete]);
 
-  // 共用文字
-  const greeting = pikminHatchedGreeting(tribeName, pikmin);
-
+  // Reduced motion:跳過動畫,直接 onComplete(WelcomeCard 接手)
   if (reducedMotion) {
-    // 純文字版本,沒動畫
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/60 backdrop-blur-sm"
-      >
-        <PikminSpriteInline color={pikmin.color} />
-        <p className="text-sm font-display text-foreground">{greeting}</p>
-      </div>
-    );
+    return null;
   }
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/40 backdrop-blur-sm"
+      className="absolute inset-0 flex items-center justify-center bg-background/30 backdrop-blur-[2px]"
     >
-      {/* 蛋抖動 → 縮小消失(animation 用 keyframes 排序) */}
+      {/* 蛋震動 → 縮小消失 */}
       <motion.div
         className="size-12 rounded-full bg-[var(--island-paper)] border-2 border-[var(--island-soil)] shadow-md"
         initial={{ scale: 1, rotate: 0, opacity: 1 }}
@@ -89,7 +78,7 @@ export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
         aria-hidden
       />
 
-      {/* 小精靈從原位置跳出來(delay 0.7s 蛋裂後)*/}
+      {/* 小精靈從原位置 spring 跳出來(delay 0.7s 蛋裂後)*/}
       <motion.div
         className="absolute size-12"
         initial={{ scale: 0, y: 10 }}
@@ -102,16 +91,6 @@ export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
       >
         <PikminSpriteInline color={pikmin.color} />
       </motion.div>
-
-      {/* 歡迎文字 */}
-      <motion.p
-        className="absolute mt-24 text-sm font-display text-foreground"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: ISLAND_DURATION.short, delay: 1.2 }}
-      >
-        {greeting}
-      </motion.p>
     </div>
   );
 }

@@ -13,7 +13,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIslandState } from '@/lib/island-api';
 import {
@@ -25,6 +25,7 @@ import {
 import { pickRandomEvent } from '@/lib/island-content';
 import type { Pikmin } from '@/lib/island-types';
 import { EggHatchScene } from './EggHatchScene';
+import { WelcomeCard } from './WelcomeCard';
 
 const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
   green: 'var(--pikmin-green)',
@@ -38,13 +39,17 @@ export function IslandShell() {
   const { data, isLoading, isError } = useIslandState();
 
   // 動畫 consumed gate:每個 trigger.newPikmin.id 對應一次播放
-  // 用 ID 不用 boolean flag,確保 trigger 換新 pikmin 時可重新播
-  // 直接從 data 同步推導 isPlayingHatch — first render 就決定狀態(避免 flock 閃現 race)
   const triggerNewPikmin = data?.monthlyTrigger?.newPikmin ?? null;
   const [consumedHatchId, setConsumedHatchId] = useState<string | null>(null);
+  // 兩段式:先播動畫(EggHatchScene),動畫完才出 WelcomeCard 讓 user acknowledge
+  const [hatchAnimationDoneId, setHatchAnimationDoneId] = useState<string | null>(null);
 
-  const isPlayingHatch =
+  const isUnconsumedTrigger =
     triggerNewPikmin !== null && triggerNewPikmin.id !== consumedHatchId;
+  const isPlayingHatchAnimation =
+    isUnconsumedTrigger && triggerNewPikmin.id !== hatchAnimationDoneId;
+  const isShowingWelcomeCard =
+    isUnconsumedTrigger && triggerNewPikmin.id === hatchAnimationDoneId;
 
   if (isLoading) {
     return (
@@ -80,8 +85,9 @@ export function IslandShell() {
   const mascotAge = state.profile.mascot.age;
   const allPikmin = state.collections.pikmin;
 
-  // 正在孵化的 pikmin 從 visiblePikmin 過濾掉,避免 PikminFlock 搶先畫到 = 動畫沒 race
-  const visiblePikmin = isPlayingHatch
+  // 正在孵化的 pikmin 從 visiblePikmin 過濾掉(只在動畫階段),避免 flock 搶先畫到
+  // WelcomeCard 階段 pikmin 已該在 flock 顯示(user 看到她在島上 + 卡片同時)
+  const visiblePikmin = isPlayingHatchAnimation
     ? allPikmin.filter((p) => p.id !== triggerNewPikmin?.id)
     : allPikmin;
   const hasHatched = visiblePikmin.length > 0;
@@ -93,8 +99,12 @@ export function IslandShell() {
       mascotAge={mascotAge}
       visiblePikmin={visiblePikmin}
       hasHatched={hasHatched}
-      hatchingPikmin={isPlayingHatch ? triggerNewPikmin : null}
-      onHatchComplete={() =>
+      hatchingPikmin={isPlayingHatchAnimation ? triggerNewPikmin : null}
+      welcomingPikmin={isShowingWelcomeCard ? triggerNewPikmin : null}
+      onHatchAnimationDone={() =>
+        setHatchAnimationDoneId(triggerNewPikmin?.id ?? null)
+      }
+      onWelcomeAcknowledge={() =>
         setConsumedHatchId(triggerNewPikmin?.id ?? null)
       }
     />
@@ -107,8 +117,12 @@ type ViewProps = {
   mascotAge: number;
   visiblePikmin: Pikmin[];
   hasHatched: boolean;
+  /** 動畫階段正在孵化的 pikmin(EggHatchScene 顯示) */
   hatchingPikmin: Pikmin | null;
-  onHatchComplete: () => void;
+  /** 動畫播完後待 acknowledge 的 pikmin(WelcomeCard 顯示) */
+  welcomingPikmin: Pikmin | null;
+  onHatchAnimationDone: () => void;
+  onWelcomeAcknowledge: () => void;
 };
 
 function IslandView({
@@ -118,7 +132,9 @@ function IslandView({
   visiblePikmin,
   hasHatched,
   hatchingPikmin,
-  onHatchComplete,
+  welcomingPikmin,
+  onHatchAnimationDone,
+  onWelcomeAcknowledge,
 }: ViewProps) {
   // 隨機事件 — 用 daily seed 確保同一天打開看到一樣的 event(避免 hydration 閃爍)
   const dailyEvent = useMemo(() => {
@@ -203,28 +219,40 @@ function IslandView({
           <PikminFlock pikminList={visiblePikmin} />
         )}
 
-        {/* 蛋孵化動畫(只在 hatchingPikmin !== null 時播) */}
+        {/* 蛋孵化動畫(只在 hatchingPikmin !== null 時播,動畫完 onHatchAnimationDone 接力) */}
         <AnimatePresence>
           {hatchingPikmin && (
             <EggHatchScene
               key={hatchingPikmin.id}
               pikmin={hatchingPikmin}
-              tribeName={tribeName}
-              onComplete={onHatchComplete}
+              onComplete={onHatchAnimationDone}
             />
           )}
         </AnimatePresence>
       </motion.section>
 
-      {/* 引導文字 / 隨機事件腳本 */}
-      <motion.div
-        className="text-center text-sm text-muted-foreground"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: ISLAND_DURATION.short, delay: 0.6 }}
-      >
-        {dailyEvent}
-      </motion.div>
+      {/* 文字區:welcomingPikmin 在 → WelcomeCard;否則 → daily random event */}
+      <AnimatePresence mode="wait">
+        {welcomingPikmin ? (
+          <WelcomeCard
+            key={`welcome-${welcomingPikmin.id}`}
+            pikmin={welcomingPikmin}
+            tribeName={tribeName}
+            onAcknowledge={onWelcomeAcknowledge}
+          />
+        ) : (
+          <motion.div
+            key="daily-event"
+            className="text-center text-sm text-muted-foreground"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: ISLAND_DURATION.short, delay: 0.6 }}
+          >
+            {dailyEvent}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

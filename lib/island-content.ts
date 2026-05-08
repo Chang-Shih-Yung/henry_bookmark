@@ -60,17 +60,25 @@ export function pickRandomEvent(tribe: string, seed?: number): string {
 }
 
 /**
- * 第一隻 pikmin 孵化後的歡迎句(取代「{tribe} 還在睡」的初始狀態)。
+ * 第一隻 pikmin 孵化後的歡迎句(welcome card 標題)。
  */
-export function pikminHatchedGreeting(tribe: string, pikmin: Pikmin): string {
-  const colorWord: Record<typeof pikmin.color, string> = {
-    green: '綠色的',
-    violet: '紫色的',
-    orange: '橙色的',
-    cyan: '藍色的',
-    grey: '灰色的',
+export function pikminHatchedGreeting(tribe: string, _pikmin: Pikmin): string {
+  return `${tribe} 來了。`;
+}
+
+/**
+ * Welcome card body text — 依小精靈顏色出現不同 Pikmin Bloom 調性的句子。
+ * 動植物動詞優先,不情勒、不解釋規則。
+ */
+export function pikminWelcomeFlavor(pikmin: Pikmin): string {
+  const FLAVOR: Record<Pikmin['color'], string> = {
+    green: '她在草地上打了個哈欠,然後坐下來。',
+    violet: '她對著海發了一陣呆,沒人知道她在想什麼。',
+    orange: '她抓著一片葉子,跳了兩下,葉子掉了。',
+    cyan: '她蹲在水邊看自己的倒影,看了好久。',
+    grey: '她坐在石頭上,沒動,陪著風。',
   };
-  return `第一隻 ${colorWord[pikmin.color]} ${tribe} 來了。`;
+  return FLAVOR[pikmin.color];
 }
 
 /**
