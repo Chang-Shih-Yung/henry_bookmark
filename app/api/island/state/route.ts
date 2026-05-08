@@ -16,16 +16,20 @@ import { errorResponse, okResponse, requireAuth } from '@/lib/api-helpers';
 import { FEATURES } from '@/lib/feature-flags';
 import {
   holdingsKey,
+  islandPostcardLockKey,
+  islandPostcardsKey,
   islandStateKey,
   parseRedisJson,
   redis,
 } from '@/lib/redis';
+import { toTaipeiYYYYMM } from '@/lib/streak-calc';
 import {
   defaultIslandState,
   mergeIslandState,
   type IslandState,
 } from '@/lib/island-types';
 import { applyMonthlyTrigger } from '@/lib/island-monthly';
+import { generatePostcardsForMonths } from '@/lib/postcard-generator';
 import type { Holdings } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -101,6 +105,28 @@ export async function GET() {
     await redis.set(stateKey, JSON.stringify(nextState));
   }
 
+  // Phase 3:trigger 觸發後生成月扣明信片(template-mode 同步,Phase 4+ Claude 走串流)
+  // 在 state 寫回後做,確保資料一致 — 即使 postcard 生成失敗,state 也對
+  if (trigger && trigger.monthsTriggered.length > 0) {
+    try {
+      const result = await generatePostcardsForMonths(
+        session.email,
+        trigger.monthsTriggered,
+        {
+          tribe: nextState.profile.pikminTribeName,
+          dominantColor:
+            nextState.collections.pikmin[nextState.collections.pikmin.length - 1]
+              ?.color ?? 'green',
+        },
+      );
+      trigger.newPostcardIds = result.newPostcardIds;
+    } catch (err) {
+      // postcard 生成失敗不影響 state 回傳 — 下次 GET 同月再試
+      // 用 idempotency lock 已防雙寫,所以重試 OK
+      console.error('[island/state] postcard generation failed', err);
+    }
+  }
+
   return okResponse({ state: nextState, monthlyTrigger: trigger });
 }
 
@@ -119,7 +145,15 @@ export async function DELETE() {
   const session = await requireAuth();
   if (!session.ok) return session.response;
 
-  await redis.del(islandStateKey(session.email));
+  // 同時清:state + postcards list + 當月 idempotency lock(讓 dev reset 後
+  // 重新 GET 會 fresh trigger 月扣 ritual)。其他月份的 lock 不清 — TTL 60 天
+  // 自然過期,且 replay 主要驗證當月,不需要 cascade delete。
+  const nowMonth = toTaipeiYYYYMM(new Date().toISOString());
+  await Promise.all([
+    redis.del(islandStateKey(session.email)),
+    redis.del(islandPostcardsKey(session.email)),
+    nowMonth ? redis.del(islandPostcardLockKey(session.email, nowMonth)) : Promise.resolve(),
+  ]);
 
   return okResponse({ deleted: true });
 }

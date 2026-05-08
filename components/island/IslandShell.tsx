@@ -13,9 +13,15 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useIslandState } from '@/lib/island-api';
+import {
+  useIslandState,
+  useMarkPostcardsRead,
+  usePostcards,
+  useUnreadPostcardCount,
+} from '@/lib/island-api';
 import {
   dropDown,
   idleBob,
@@ -23,9 +29,10 @@ import {
   ISLAND_EASE,
 } from '@/lib/animations';
 import { pickRandomEvent } from '@/lib/island-content';
-import type { Pikmin } from '@/lib/island-types';
+import type { Pikmin, Postcard } from '@/lib/island-types';
 import { EggHatchScene } from './EggHatchScene';
 import { WelcomeCard } from './WelcomeCard';
+import { PostcardRitual } from './PostcardRitual';
 
 const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
   green: 'var(--pikmin-green)',
@@ -37,6 +44,9 @@ const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
 
 export function IslandShell() {
   const { data, isLoading, isError } = useIslandState();
+  const postcardsQuery = usePostcards();
+  const unreadCount = useUnreadPostcardCount();
+  const markRead = useMarkPostcardsRead();
 
   // 動畫 consumed gate:每個 trigger.newPikmin.id 對應一次播放
   const triggerNewPikmin = data?.monthlyTrigger?.newPikmin ?? null;
@@ -50,6 +60,28 @@ export function IslandShell() {
     isUnconsumedTrigger && triggerNewPikmin.id !== hatchAnimationDoneId;
   const isShowingWelcomeCard =
     isUnconsumedTrigger && triggerNewPikmin.id === hatchAnimationDoneId;
+
+  // Phase 3:monthly trigger 帶來的新 postcards → 自動推進 ritual
+  // 只在 hatch ceremony 結束後(WelcomeCard consumed)才推 postcard,避免疊加儀式
+  const newPostcardIds = data?.monthlyTrigger?.newPostcardIds ?? [];
+  const [autoOpenedPostcardId, setAutoOpenedPostcardId] = useState<string | null>(null);
+  const [activePostcard, setActivePostcard] = useState<Postcard | null>(null);
+
+  useEffect(() => {
+    if (newPostcardIds.length === 0) return;
+    if (isUnconsumedTrigger) return; // 等 hatch 儀式完才推 postcard
+    const list = postcardsQuery.data ?? [];
+    // 只挑「本次 trigger 帶來的」postcard,從新到舊
+    for (const id of newPostcardIds) {
+      if (autoOpenedPostcardId === id) continue;
+      const found = list.find((p) => p.id === id);
+      if (found) {
+        setActivePostcard(found);
+        setAutoOpenedPostcardId(id);
+        break;
+      }
+    }
+  }, [newPostcardIds, isUnconsumedTrigger, postcardsQuery.data, autoOpenedPostcardId]);
 
   if (isLoading) {
     return (
@@ -93,21 +125,39 @@ export function IslandShell() {
   const hasHatched = visiblePikmin.length > 0;
 
   return (
-    <IslandView
-      tribeName={tribeName}
-      streak={streak}
-      mascotAge={mascotAge}
-      visiblePikmin={visiblePikmin}
-      hasHatched={hasHatched}
-      hatchingPikmin={isPlayingHatchAnimation ? triggerNewPikmin : null}
-      welcomingPikmin={isShowingWelcomeCard ? triggerNewPikmin : null}
-      onHatchAnimationDone={() =>
-        setHatchAnimationDoneId(triggerNewPikmin?.id ?? null)
-      }
-      onWelcomeAcknowledge={() =>
-        setConsumedHatchId(triggerNewPikmin?.id ?? null)
-      }
-    />
+    <>
+      <IslandView
+        tribeName={tribeName}
+        streak={streak}
+        mascotAge={mascotAge}
+        visiblePikmin={visiblePikmin}
+        hasHatched={hasHatched}
+        hatchingPikmin={isPlayingHatchAnimation ? triggerNewPikmin : null}
+        welcomingPikmin={isShowingWelcomeCard ? triggerNewPikmin : null}
+        unreadCount={unreadCount}
+        onHatchAnimationDone={() =>
+          setHatchAnimationDoneId(triggerNewPikmin?.id ?? null)
+        }
+        onWelcomeAcknowledge={() =>
+          setConsumedHatchId(triggerNewPikmin?.id ?? null)
+        }
+      />
+
+      {/* PostcardRitual portal — 顯示一張 postcard 給 user 看完 + 蓋戳章 */}
+      <PostcardRitual
+        postcard={activePostcard}
+        open={activePostcard !== null}
+        onOpenChange={(open) => {
+          if (!open) setActivePostcard(null);
+        }}
+        onClose={() => {
+          // 關閉 ritual → 標已讀,client 會 refetch postcards 更新紅點
+          if (activePostcard) {
+            markRead.mutate([activePostcard.id]);
+          }
+        }}
+      />
+    </>
   );
 }
 
@@ -121,6 +171,7 @@ type ViewProps = {
   hatchingPikmin: Pikmin | null;
   /** 動畫播完後待 acknowledge 的 pikmin(WelcomeCard 顯示) */
   welcomingPikmin: Pikmin | null;
+  unreadCount: number;
   onHatchAnimationDone: () => void;
   onWelcomeAcknowledge: () => void;
 };
@@ -133,6 +184,7 @@ function IslandView({
   hasHatched,
   hatchingPikmin,
   welcomingPikmin,
+  unreadCount,
   onHatchAnimationDone,
   onWelcomeAcknowledge,
 }: ViewProps) {
@@ -157,14 +209,21 @@ function IslandView({
           <span className="size-1.5 rounded-full bg-[var(--pikmin-green)]" aria-hidden />
           <span className="font-display tabular-nums">連續 {streak} 天</span>
         </div>
-        <button
-          type="button"
-          aria-label="信箱(Phase 3 開放)"
-          disabled
-          className="opacity-30 size-8 rounded-full border border-border bg-card/40 backdrop-blur-sm"
+        <Link
+          href="/island/postcards"
+          aria-label={`信箱${unreadCount > 0 ? `,${unreadCount} 封未讀` : ''}`}
+          className="relative size-8 rounded-full border border-border bg-card/40 backdrop-blur-sm flex items-center justify-center text-sm transition-transform active:scale-95 [-webkit-tap-highlight-color:transparent]"
         >
           📮
-        </button>
+          {unreadCount > 0 && (
+            <span
+              aria-hidden
+              className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-[var(--accent-brand)] text-[9px] font-display tabular-nums text-foreground flex items-center justify-center px-1 leading-none"
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Link>
       </header>
 
       {/* Island view */}

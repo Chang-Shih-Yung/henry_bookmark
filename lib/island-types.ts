@@ -267,6 +267,8 @@ export type MonthlyTriggerResult = {
   };
   /** 是否孵化新小精靈(只在第一次月份切換 + 沒孵化過時 trigger) */
   newPikmin: Pikmin | null;
+  /** Phase 3:本次 trigger 新增的 postcard ID list(client 用來顯示信箱紅點 + 自動跳 ritual) */
+  newPostcardIds: string[];
 };
 
 /** Pikmin spawn 上下文 — 從 V1 holdings 推算出顏色 */

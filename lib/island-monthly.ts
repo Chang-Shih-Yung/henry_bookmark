@@ -93,6 +93,7 @@ export function applyMonthlyTrigger(
       monthsTriggered,
       streakResult,
       newPikmin,
+      newPostcardIds: [], // state route 在 applyMonthlyTrigger 之後填入(因為 postcard 生成需要 Redis access)
     },
   };
 }

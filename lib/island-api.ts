@@ -15,9 +15,14 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { IslandState, MonthlyTriggerResult } from './island-types';
+import type {
+  IslandState,
+  MonthlyTriggerResult,
+  Postcard,
+} from './island-types';
 
 const ISLAND_QUERY_KEY = ['island', 'state'] as const;
+const POSTCARDS_QUERY_KEY = ['island', 'postcards'] as const;
 
 /** Phase 2:server 回的 GET payload 含 monthly trigger 結果 */
 export type IslandStatePayload = {
@@ -47,6 +52,69 @@ export function useIslandState() {
 /** Phase 2:取本次 GET 的 monthly trigger(只在剛切月份的那次 GET 不為 null)*/
 export function useMonthlyTrigger(): MonthlyTriggerResult | null {
   return useIslandState().data?.monthlyTrigger ?? null;
+}
+
+/* ============================================================
+   Phase 3 — Postcards
+   ============================================================ */
+
+async function fetchPostcards(): Promise<Postcard[]> {
+  const r = await fetch('/api/island/postcards', { method: 'GET' });
+  if (!r.ok) throw new Error(`postcards fetch failed: ${r.status}`);
+  const json = await r.json();
+  return (json.postcards ?? []) as Postcard[];
+}
+
+export function usePostcards() {
+  return useQuery({
+    queryKey: POSTCARDS_QUERY_KEY,
+    queryFn: fetchPostcards,
+    staleTime: 30_000,
+    gcTime: 24 * 60 * 60 * 1000,
+  });
+}
+
+/** 未讀數量 — IslandShell mailbox 紅點用 */
+export function useUnreadPostcardCount(): number {
+  const list = usePostcards().data ?? [];
+  return list.filter((p) => p.readAt === null).length;
+}
+
+export function useMarkPostcardsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return false;
+      const r = await fetch('/api/island/postcards', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.reason ?? `mark read failed: ${r.status}`);
+      }
+      return true;
+    },
+    onSuccess: (_ok, ids) => {
+      // 更新 cache
+      const idSet = new Set(ids);
+      const nowIso = new Date().toISOString();
+      queryClient.setQueryData<Postcard[]>(POSTCARDS_QUERY_KEY, (prev) =>
+        prev?.map((p) =>
+          idSet.has(p.id) && p.readAt === null ? { ...p, readAt: nowIso } : p,
+        ) ?? prev,
+      );
+    },
+  });
+}
+
+/**
+ * 取最新一張 postcard(信箱頂端 / monthlyTrigger 自動推進 ritual 用)
+ */
+export function useLatestPostcard(): Postcard | null {
+  const list = usePostcards().data ?? [];
+  return list[0] ?? null; // server 已 reverse-chronological 排
 }
 
 /* ============================================================
