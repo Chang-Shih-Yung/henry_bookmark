@@ -230,6 +230,60 @@ function IslandView({
 }
 
 /**
+ * Pikmin sprite — Phase 2 placeholder。
+ *
+ * 跟蛋的視覺區分:
+ * - 蛋:純白米色圓 + 棕邊
+ * - 小精靈:該顏色圓 + 黑邊 + **頂端一片小葉子**(對應 stage='sprout' 從蛋裡爬出來)
+ *
+ * Phase 4 真實美術資產進來後此 component 整個換掉。
+ */
+function PikminSprite({
+  color,
+  stage,
+}: {
+  color: Pikmin['color'];
+  stage: Pikmin['stage'];
+}) {
+  const showSprout = stage === 'sprout' || stage === 'small' || stage === 'medium';
+  return (
+    <div className="relative size-full">
+      {/* 葉子莖(從圓頂出芽) */}
+      {showSprout && (
+        <svg
+          aria-hidden
+          viewBox="0 0 24 32"
+          className="absolute -top-3 left-1/2 -translate-x-1/2 h-4 w-3 drop-shadow-sm"
+        >
+          {/* 莖 */}
+          <line
+            x1="12"
+            y1="32"
+            x2="12"
+            y2="14"
+            stroke="var(--island-grass-dark)"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          {/* 葉片(水滴形)*/}
+          <path
+            d="M12 4 C 4 4, 4 14, 12 14 C 20 14, 20 4, 12 4 Z"
+            fill="var(--pikmin-green)"
+            stroke="var(--island-grass-dark)"
+            strokeWidth="1.5"
+          />
+        </svg>
+      )}
+      {/* 身體 */}
+      <div
+        className="size-full rounded-full border-2 border-foreground shadow-md"
+        style={{ backgroundColor: PIKMIN_BG_VAR[color] }}
+      />
+    </div>
+  );
+}
+
+/**
  * 小精靈群 — Phase 2 一隻,Phase 5+ 會多到 5-7 隻散布
  */
 function PikminFlock({ pikminList }: { pikminList: Pikmin[] }) {
@@ -249,16 +303,13 @@ function PikminFlock({ pikminList }: { pikminList: Pikmin[] }) {
         return (
           <motion.div
             key={p.id}
-            className="absolute size-10 flex items-center justify-center"
+            className="absolute size-10"
             style={pos}
             variants={idleBob}
             animate="animate"
+            aria-label={`${p.color} 小精靈,目前 ${p.stage} 階段`}
           >
-            <div
-              className="size-full rounded-full border-2 border-foreground shadow-md"
-              style={{ backgroundColor: PIKMIN_BG_VAR[p.color] }}
-              aria-label={`${p.color} 小精靈,目前 ${p.stage} 階段`}
-            />
+            <PikminSprite color={p.color} stage={p.stage} />
           </motion.div>
         );
       })}

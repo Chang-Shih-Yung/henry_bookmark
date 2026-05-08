@@ -60,11 +60,7 @@ export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
         aria-live="polite"
         className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/60 backdrop-blur-sm"
       >
-        <div
-          className="size-12 rounded-full border-2 border-foreground"
-          style={{ backgroundColor: PIKMIN_BG_VAR[pikmin.color] }}
-          aria-hidden
-        />
+        <PikminSpriteInline color={pikmin.color} />
         <p className="text-sm font-display text-foreground">{greeting}</p>
       </div>
     );
@@ -95,8 +91,7 @@ export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
 
       {/* 小精靈從原位置跳出來(delay 0.7s 蛋裂後)*/}
       <motion.div
-        className="absolute size-12 rounded-full border-2 border-foreground"
-        style={{ backgroundColor: PIKMIN_BG_VAR[pikmin.color] }}
+        className="absolute size-12"
         initial={{ scale: 0, y: 10 }}
         animate={{ scale: 1, y: 0 }}
         transition={{
@@ -104,7 +99,9 @@ export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
           delay: 0.7,
         }}
         aria-hidden
-      />
+      >
+        <PikminSpriteInline color={pikmin.color} />
+      </motion.div>
 
       {/* 歡迎文字 */}
       <motion.p
@@ -115,6 +112,43 @@ export function EggHatchScene({ pikmin, tribeName, onComplete }: Props) {
       >
         {greeting}
       </motion.p>
+    </div>
+  );
+}
+
+/**
+ * Pikmin sprite inline 版 — 跟 IslandShell 的 PikminSprite 視覺一致(sprout stage)。
+ * 抽出來避免 IslandShell ↔ EggHatchScene 互相 import 的循環依賴。
+ */
+function PikminSpriteInline({ color }: { color: Pikmin['color'] }) {
+  return (
+    <div className="relative size-12">
+      {/* 葉子(從圓頂出芽 — sprout 階段視覺特徵)*/}
+      <svg
+        aria-hidden
+        viewBox="0 0 24 32"
+        className="absolute -top-3 left-1/2 -translate-x-1/2 h-4 w-3 drop-shadow-sm"
+      >
+        <line
+          x1="12"
+          y1="32"
+          x2="12"
+          y2="14"
+          stroke="var(--island-grass-dark)"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        <path
+          d="M12 4 C 4 4, 4 14, 12 14 C 20 14, 20 4, 12 4 Z"
+          fill="var(--pikmin-green)"
+          stroke="var(--island-grass-dark)"
+          strokeWidth="1.5"
+        />
+      </svg>
+      <div
+        className="size-full rounded-full border-2 border-foreground shadow-md"
+        style={{ backgroundColor: PIKMIN_BG_VAR[color] }}
+      />
     </div>
   );
 }
