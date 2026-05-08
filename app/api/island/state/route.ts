@@ -14,12 +14,19 @@
 import { z } from 'zod';
 import { errorResponse, okResponse, requireAuth } from '@/lib/api-helpers';
 import { FEATURES } from '@/lib/feature-flags';
-import { islandStateKey, parseRedisJson, redis } from '@/lib/redis';
+import {
+  holdingsKey,
+  islandStateKey,
+  parseRedisJson,
+  redis,
+} from '@/lib/redis';
 import {
   defaultIslandState,
   mergeIslandState,
   type IslandState,
 } from '@/lib/island-types';
+import { applyMonthlyTrigger } from '@/lib/island-monthly';
+import type { Holdings } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,7 +61,14 @@ const PostBodySchema = z.object({
 });
 
 /* ============================================================
-   GET — 讀 state
+   GET — 讀 state + 套用 monthly trigger(Phase 2)
+
+   流程:
+   1. 讀現有 state(沒就 default)
+   2. 平行讀 V1 holdings(用來決定第一隻 pikmin 顏色)
+   3. 套 applyMonthlyTrigger:同月 → noop,新月 → streak +1 + 可能孵化
+   4. 若 trigger 不為 null → 寫回 state
+   5. 回 { state, monthlyTrigger }
    ============================================================ */
 export async function GET() {
   const flagBlock = ensureFlagOn();
@@ -63,14 +77,31 @@ export async function GET() {
   const session = await requireAuth();
   if (!session.ok) return session.response;
 
-  const key = islandStateKey(session.email);
-  const raw = await redis.get<unknown>(key);
-  const stored = parseRedisJson<IslandState>(raw);
+  const stateKey = islandStateKey(session.email);
+  const hKey = holdingsKey(session.email);
 
-  // 沒紀錄 → 回 default(不寫,等第一次 patch 才落地)
-  const state = stored ?? defaultIslandState();
+  // 平行讀 island state + holdings(holdings 只在第一次孵化時用,但 daily fetch 也 OK)
+  const [rawState, rawHoldings] = await Promise.all([
+    redis.get<unknown>(stateKey),
+    redis.get<unknown>(hKey),
+  ]);
 
-  return okResponse({ state });
+  const stored = parseRedisJson<IslandState>(rawState);
+  const holdings = parseRedisJson<Holdings>(rawHoldings);
+
+  const current = stored ?? defaultIslandState();
+
+  // 套 monthly trigger
+  const nowIso = new Date().toISOString();
+  const { nextState, trigger } = applyMonthlyTrigger(current, holdings, nowIso);
+
+  // 只有 state 真的有變才寫回(避免每次 GET 都打 Redis write)
+  const stateChanged = nextState !== current;
+  if (stateChanged) {
+    await redis.set(stateKey, JSON.stringify(nextState));
+  }
+
+  return okResponse({ state: nextState, monthlyTrigger: trigger });
 }
 
 /* ============================================================

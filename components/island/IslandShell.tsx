@@ -1,26 +1,51 @@
 'use client';
 
 /**
- * IslandShell — Phase 1 island 主畫面 minimal 版本。
+ * IslandShell — Phase 2 island 主畫面。
  *
- * Phase 1 視覺(GDD §32.13 + DESIGN.md 畫面 1):
- * - 連續紀錄 badge 左上
- * - mascot 站立中央 + 年齡小字
- * - 蛋(尚未孵化)
- * - 文字「她還在睡。下次月扣會孵化。」
- * - 純 SVG placeholder,Phase 4 換真實美術資產
+ * Phase 2 vs Phase 1 的差別:
+ * - 顯示孵化後的小精靈(從 collections.pikmin)+ 蛋只在還沒孵化時出現
+ * - 隨機事件腳本(30 種輪播 toast)
+ * - 偵測 monthlyTrigger.newPikmin → 播 EggHatchScene
+ * - 顯示 streak 是真實 server 算的(不是寫死 0)
  *
- * Phase 2 擴充:孵化動畫、隨機事件 toast
- * Phase 3 擴充:月扣明信片入口、mailbox icon
+ * Phase 4 視覺資產到位前:小精靈仍是色塊圓圈、mascot 仍是米色圓圈(設計如此,GDD §35)
  */
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useIslandState } from '@/lib/island-api';
-import { dropDown, idleBob, ISLAND_DURATION, ISLAND_EASE } from '@/lib/animations';
+import {
+  dropDown,
+  idleBob,
+  ISLAND_DURATION,
+  ISLAND_EASE,
+} from '@/lib/animations';
+import { pickRandomEvent } from '@/lib/island-content';
+import type { Pikmin } from '@/lib/island-types';
+import { EggHatchScene } from './EggHatchScene';
+
+const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
+  green: 'var(--pikmin-green)',
+  violet: 'var(--pikmin-violet)',
+  orange: 'var(--pikmin-orange)',
+  cyan: 'var(--pikmin-cyan)',
+  grey: 'var(--pikmin-grey)',
+};
 
 export function IslandShell() {
   const { data, isLoading, isError } = useIslandState();
+
+  // 蛋孵化動畫 gate:trigger 來時 → 播動畫 → onComplete 後切回正常
+  const [hatchingPikmin, setHatchingPikmin] = useState<Pikmin | null>(null);
+
+  useEffect(() => {
+    const newPikmin = data?.monthlyTrigger?.newPikmin;
+    if (newPikmin && !hatchingPikmin) {
+      setHatchingPikmin(newPikmin);
+    }
+  }, [data?.monthlyTrigger, hatchingPikmin]);
 
   if (isLoading) {
     return (
@@ -32,7 +57,7 @@ export function IslandShell() {
   }
 
   if (isError || !data) {
-    // Pass 2 互動狀態矩陣:不暴露技術錯誤
+    // Pass 2 互動狀態矩陣:不暴露技術錯誤(GDD §32.5)
     return (
       <main className="mx-auto w-full max-w-2xl p-4 pb-32">
         <div className="rounded-3xl border border-border bg-card/40 p-12 text-center text-sm text-muted-foreground">
@@ -50,15 +75,59 @@ export function IslandShell() {
     );
   }
 
-  const tribeName = data.profile.pikminTribeName;
-  const streak = data.tracks.time.currentStreak;
-  const mascotAge = data.profile.mascot.age;
+  const { state } = data;
+  const tribeName = state.profile.pikminTribeName;
+  const streak = state.tracks.time.currentStreak;
+  const mascotAge = state.profile.mascot.age;
+  const pikminList = state.collections.pikmin;
+  const hasHatched = pikminList.length > 0;
+
+  return (
+    <IslandView
+      tribeName={tribeName}
+      streak={streak}
+      mascotAge={mascotAge}
+      pikminList={pikminList}
+      hasHatched={hasHatched}
+      hatchingPikmin={hatchingPikmin}
+      onHatchComplete={() => setHatchingPikmin(null)}
+    />
+  );
+}
+
+type ViewProps = {
+  tribeName: string;
+  streak: number;
+  mascotAge: number;
+  pikminList: Pikmin[];
+  hasHatched: boolean;
+  hatchingPikmin: Pikmin | null;
+  onHatchComplete: () => void;
+};
+
+function IslandView({
+  tribeName,
+  streak,
+  mascotAge,
+  pikminList,
+  hasHatched,
+  hatchingPikmin,
+  onHatchComplete,
+}: ViewProps) {
+  // 隨機事件 — 用 daily seed 確保同一天打開看到一樣的 event(避免 hydration 閃爍)
+  const dailyEvent = useMemo(() => {
+    if (!hasHatched) return `${tribeName} 還在睡。`;
+    const today = new Date();
+    const seed =
+      today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    return pickRandomEvent(tribeName, seed);
+  }, [tribeName, hasHatched]);
 
   return (
     <main
       className="mx-auto w-full max-w-2xl p-4 pb-32 space-y-6"
       style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}
-      aria-label={`你的島嶼,Day ${data.tracks.time.daysOpened},連續 ${streak} 天`}
+      aria-label={`你的島嶼,連續 ${streak} 天`}
     >
       {/* Top row: streak badge */}
       <header className="flex items-center justify-between text-xs">
@@ -66,7 +135,6 @@ export function IslandShell() {
           <span className="size-1.5 rounded-full bg-[var(--pikmin-green)]" aria-hidden />
           <span className="font-display tabular-nums">連續 {streak} 天</span>
         </div>
-        {/* Mailbox icon (Phase 3 才接 /island/postcards),Phase 1 只放占位 */}
         <button
           type="button"
           aria-label="信箱(Phase 3 開放)"
@@ -77,7 +145,7 @@ export function IslandShell() {
         </button>
       </header>
 
-      {/* Island view — Phase 1 是 SVG placeholder,Phase 4 換真實美術資產 */}
+      {/* Island view */}
       <motion.section
         className="relative aspect-[3/4] w-full rounded-[40%_60%_55%_45%/45%_50%_50%_55%] overflow-hidden"
         style={{
@@ -103,33 +171,91 @@ export function IslandShell() {
           </span>
         </motion.div>
 
-        {/* 蛋 — 從天空飄下,落地後 idle */}
-        <motion.div
-          className="absolute right-[20%] top-[55%] size-10"
-          variants={dropDown}
-          initial="initial"
-          animate="animate"
-          transition={{
-            duration: ISLAND_DURATION.medium,
-            delay: 0.3,
-          }}
-          aria-label="尚未孵化的蛋"
-        >
-          <div className="size-full rounded-full bg-[var(--island-paper)] border-2 border-[var(--island-soil)] shadow-md" />
-        </motion.div>
+        {/* 蛋(尚未孵化時出現) */}
+        <AnimatePresence>
+          {!hasHatched && !hatchingPikmin && (
+            <motion.div
+              key="egg"
+              className="absolute right-[20%] top-[55%] size-10"
+              variants={dropDown}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{
+                duration: ISLAND_DURATION.medium,
+                delay: 0.3,
+              }}
+              aria-label="尚未孵化的蛋"
+            >
+              <div className="size-full rounded-full bg-[var(--island-paper)] border-2 border-[var(--island-soil)] shadow-md" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 已孵化的小精靈們 — Phase 2 通常只有 1 隻,Phase 5+ 才會多 */}
+        {hasHatched && !hatchingPikmin && (
+          <PikminFlock pikminList={pikminList} />
+        )}
+
+        {/* 蛋孵化動畫(只在 hatchingPikmin !== null 時播) */}
+        <AnimatePresence>
+          {hatchingPikmin && (
+            <EggHatchScene
+              key={hatchingPikmin.id}
+              pikmin={hatchingPikmin}
+              tribeName={tribeName}
+              onComplete={onHatchComplete}
+            />
+          )}
+        </AnimatePresence>
       </motion.section>
 
-      {/* 引導文字 — Pikmin Bloom tonality */}
+      {/* 引導文字 / 隨機事件腳本 */}
       <motion.div
         className="text-center text-sm text-muted-foreground"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: ISLAND_DURATION.short, delay: 0.6 }}
       >
-        <span className="font-display">{tribeName}</span> 還在睡。
-        <br />
-        下次月扣會孵化。
+        {dailyEvent}
       </motion.div>
     </main>
+  );
+}
+
+/**
+ * 小精靈群 — Phase 2 一隻,Phase 5+ 會多到 5-7 隻散布
+ */
+function PikminFlock({ pikminList }: { pikminList: Pikmin[] }) {
+  // 第一隻固定位置(對應 Phase 1 蛋的位置),後續每隻偏移
+  const positions = [
+    { right: '20%', top: '55%' },
+    { left: '25%', top: '50%' },
+    { right: '30%', bottom: '25%' },
+    { left: '35%', top: '65%' },
+    { right: '40%', top: '40%' },
+  ];
+
+  return (
+    <>
+      {pikminList.slice(0, 5).map((p) => {
+        const pos = positions[pikminList.indexOf(p)] ?? positions[0];
+        return (
+          <motion.div
+            key={p.id}
+            className="absolute size-10 flex items-center justify-center"
+            style={pos}
+            variants={idleBob}
+            animate="animate"
+          >
+            <div
+              className="size-full rounded-full border-2 border-foreground shadow-md"
+              style={{ backgroundColor: PIKMIN_BG_VAR[p.color] }}
+              aria-label={`${p.color} 小精靈,目前 ${p.stage} 階段`}
+            />
+          </motion.div>
+        );
+      })}
+    </>
   );
 }

@@ -253,6 +253,32 @@ export function sanitizeForVisitor(s: IslandState): VisitorView {
 }
 
 /* ============================================================
+   Phase 2 — Monthly Trigger
+   ============================================================ */
+
+/** Server 偵測到月份切換時回給 client 的結果 */
+export type MonthlyTriggerResult = {
+  /** 觸發的月份(可能多個 — 玩家失聯 N 個月後回來補單) */
+  monthsTriggered: string[];   // ["2026-04", "2026-05"]
+  /** 新 streak 跟是否中斷 */
+  streakResult: {
+    streak: number;
+    broke: boolean;            // true 觸發特別明信片(GDD §23.5 streak 中斷處理)
+  };
+  /** 是否孵化新小精靈(只在第一次月份切換 + 沒孵化過時 trigger) */
+  newPikmin: Pikmin | null;
+};
+
+/** Pikmin spawn 上下文 — 從 V1 holdings 推算出顏色 */
+export type PikminSpawnContext = {
+  /** 各資產類別 cost basis(TWD)*/
+  byType: Partial<Record<
+    'tw_stock' | 'us_stock' | 'crypto' | 'cash_twd' | 'cash_usd' | 'trust',
+    number
+  >>;
+};
+
+/* ============================================================
    Deep merge — 1 層 deep,Phase 1 夠用,Phase 2 視需要再深
    分開 export 以便單獨 test(route.ts 太多 mocking 不適合 unit test)
    ============================================================ */
