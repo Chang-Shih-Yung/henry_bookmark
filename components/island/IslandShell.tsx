@@ -37,15 +37,14 @@ const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
 export function IslandShell() {
   const { data, isLoading, isError } = useIslandState();
 
-  // 蛋孵化動畫 gate:trigger 來時 → 播動畫 → onComplete 後切回正常
-  const [hatchingPikmin, setHatchingPikmin] = useState<Pikmin | null>(null);
+  // 動畫 consumed gate:每個 trigger.newPikmin.id 對應一次播放
+  // 用 ID 不用 boolean flag,確保 trigger 換新 pikmin 時可重新播
+  // 直接從 data 同步推導 isPlayingHatch — first render 就決定狀態(避免 flock 閃現 race)
+  const triggerNewPikmin = data?.monthlyTrigger?.newPikmin ?? null;
+  const [consumedHatchId, setConsumedHatchId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const newPikmin = data?.monthlyTrigger?.newPikmin;
-    if (newPikmin && !hatchingPikmin) {
-      setHatchingPikmin(newPikmin);
-    }
-  }, [data?.monthlyTrigger, hatchingPikmin]);
+  const isPlayingHatch =
+    triggerNewPikmin !== null && triggerNewPikmin.id !== consumedHatchId;
 
   if (isLoading) {
     return (
@@ -79,18 +78,25 @@ export function IslandShell() {
   const tribeName = state.profile.pikminTribeName;
   const streak = state.tracks.time.currentStreak;
   const mascotAge = state.profile.mascot.age;
-  const pikminList = state.collections.pikmin;
-  const hasHatched = pikminList.length > 0;
+  const allPikmin = state.collections.pikmin;
+
+  // 正在孵化的 pikmin 從 visiblePikmin 過濾掉,避免 PikminFlock 搶先畫到 = 動畫沒 race
+  const visiblePikmin = isPlayingHatch
+    ? allPikmin.filter((p) => p.id !== triggerNewPikmin?.id)
+    : allPikmin;
+  const hasHatched = visiblePikmin.length > 0;
 
   return (
     <IslandView
       tribeName={tribeName}
       streak={streak}
       mascotAge={mascotAge}
-      pikminList={pikminList}
+      visiblePikmin={visiblePikmin}
       hasHatched={hasHatched}
-      hatchingPikmin={hatchingPikmin}
-      onHatchComplete={() => setHatchingPikmin(null)}
+      hatchingPikmin={isPlayingHatch ? triggerNewPikmin : null}
+      onHatchComplete={() =>
+        setConsumedHatchId(triggerNewPikmin?.id ?? null)
+      }
     />
   );
 }
@@ -99,7 +105,7 @@ type ViewProps = {
   tribeName: string;
   streak: number;
   mascotAge: number;
-  pikminList: Pikmin[];
+  visiblePikmin: Pikmin[];
   hasHatched: boolean;
   hatchingPikmin: Pikmin | null;
   onHatchComplete: () => void;
@@ -109,7 +115,7 @@ function IslandView({
   tribeName,
   streak,
   mascotAge,
-  pikminList,
+  visiblePikmin,
   hasHatched,
   hatchingPikmin,
   onHatchComplete,
@@ -194,7 +200,7 @@ function IslandView({
 
         {/* 已孵化的小精靈們 — Phase 2 通常只有 1 隻,Phase 5+ 才會多 */}
         {hasHatched && !hatchingPikmin && (
-          <PikminFlock pikminList={pikminList} />
+          <PikminFlock pikminList={visiblePikmin} />
         )}
 
         {/* 蛋孵化動畫(只在 hatchingPikmin !== null 時播) */}

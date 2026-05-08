@@ -105,6 +105,26 @@ export async function GET() {
 }
 
 /* ============================================================
+   DELETE — 清空 state(dev reset 用)
+   ============================================================
+   情境:Phase 2 動畫測試完想 replay,或者 schema 改了想清舊資料。
+   行為:刪掉 island state key + (可選)刪 postcards key。不動 V1 holdings。
+   權限:跟 GET / POST 一樣 — feature flag + auth + per-email key 隔離,
+        不會誤刪別人的。
+   ============================================================ */
+export async function DELETE() {
+  const flagBlock = ensureFlagOn();
+  if (flagBlock) return flagBlock;
+
+  const session = await requireAuth();
+  if (!session.ok) return session.response;
+
+  await redis.del(islandStateKey(session.email));
+
+  return okResponse({ deleted: true });
+}
+
+/* ============================================================
    POST — patch state
    ============================================================ */
 export async function POST(req: Request) {
