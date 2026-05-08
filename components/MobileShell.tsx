@@ -5,17 +5,43 @@ import {
   LayoutGrid,
   BarChart3,
   Settings,
+  Sprout,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FEATURES } from '@/lib/feature-flags';
 
-type TabKey = '/' | '/simulate' | '/settings';
+type TabKey = '/' | '/simulate' | '/island' | '/settings';
 
-const TABS: Array<{ href: TabKey; label: string; Icon: LucideIcon }> = [
+const BASE_TABS: Array<{ href: TabKey; label: string; Icon: LucideIcon }> = [
   { href: '/', label: '首頁', Icon: LayoutGrid },
   { href: '/simulate', label: '試算', Icon: BarChart3 },
   { href: '/settings', label: '設定', Icon: Settings },
 ];
+
+const ISLAND_TAB: { href: TabKey; label: string; Icon: LucideIcon } = {
+  href: '/island',
+  label: '島',
+  Icon: Sprout,
+};
+
+/**
+ * Tabs 組合:
+ * - V1 預設(FEATURES.island = false):3 tab(首頁 / 試算 / 設定)
+ * - 開啟 island flag:4 tab,「島」插在「試算」與「設定」之間
+ *
+ * 為什麼插中間:用戶肌肉記憶上「設定」固定在最右,island 是新增 content tab
+ * 應該跟「首頁/試算」並列。
+ */
+function getTabs(): Array<{ href: TabKey; label: string; Icon: LucideIcon }> {
+  if (!FEATURES.island) return BASE_TABS;
+  return [
+    BASE_TABS[0],     // 首頁
+    BASE_TABS[1],     // 試算
+    ISLAND_TAB,       // 島(新增)
+    BASE_TABS[2],     // 設定
+  ];
+}
 
 type Props = {
   children: React.ReactNode;
@@ -37,6 +63,7 @@ export function MobileShell({ children, active }: Props) {
 }
 
 function BottomNav({ active }: { active: TabKey }) {
+  const tabs = getTabs();
   return (
     <nav
       className={cn(
@@ -50,7 +77,7 @@ function BottomNav({ active }: { active: TabKey }) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="mx-auto max-w-2xl flex">
-        {TABS.map((t) => {
+        {tabs.map((t) => {
           const isActive = active === t.href;
           return (
             <Link

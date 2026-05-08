@@ -30,6 +30,35 @@ export const reminderConfigKey = (email: string) =>
 /** 全部啟用提醒的 user emails(cron 跑時 query 這個 set 知道要對誰發)。 */
 export const enabledRemindersKey = () => 'push:enabled-emails';
 
+/* ============================================================
+   遊戲層(island)keys — Phase 1+
+   GDD §32.7 拍板:1 個 mega-object + 高頻成長分開
+   ============================================================ */
+
+/** 主 island state mega-object */
+export const islandStateKey = (email: string) =>
+  `island:${email.toLowerCase()}`;
+
+/** 月扣明信片 list(成長量大,獨立 key)*/
+export const islandPostcardsKey = (email: string) =>
+  `island:postcards:${email.toLowerCase()}`;
+
+/** 微決策月分片 */
+export const islandMicroKey = (email: string, yyyymm: string) =>
+  `island:micro:${email.toLowerCase()}:${yyyymm}`;
+
+/** 朋友 list */
+export const islandFriendsKey = (email: string) =>
+  `island:friends:${email.toLowerCase()}`;
+
+/** 訪問紀錄 */
+export const islandVisitsKey = (email: string) =>
+  `island:visits:${email.toLowerCase()}`;
+
+/** 月扣明信片 idempotency lock(防 2 tab 同時 trigger 雙寫) */
+export const islandPostcardLockKey = (email: string, yyyymm: string) =>
+  `island:idem:postcard:${email.toLowerCase()}:${yyyymm}`;
+
 /**
  * Upstash Redis 預設 `automaticDeserialization: true`,smembers 回的會已經被 JSON.parse 過。
  * 但寫入時用 `JSON.stringify(...)` 存的話,Upstash 在讀取時可能回 string 也可能回 object
