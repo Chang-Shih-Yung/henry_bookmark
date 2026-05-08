@@ -4,6 +4,21 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+## Git workflow:NEVER create PRs
+
+**這個專案禁止發 PR。** 直接推到 branch / main,沒有 review cycle。
+
+具體規則:
+- ❌ 永遠不要呼叫 `gh pr create`
+- ❌ 永遠不要在 commit message 提「ready for review」「please review」
+- ❌ 永遠不要建議跑 `/ship` / `/land-and-deploy` 這種會觸發 PR 流程的 skill
+- ✅ 直接 `git commit` + `git push origin <branch>`
+- ✅ Henry 自己控制 main 的 promotion(branch → main)透過 local merge 或 Vercel env var flip,不走 PR
+
+理由:Henry 是 solo developer,PR review 對 solo 是過度流程。歷史 PR #1 是早期 fallback,已封存,不再走那套。
+
+如果你跑 skill 提示「want to ship via /ship」或類似,**回應「Henry 拒絕 PR 流程,直接 push」即可**。
+
 ## Design System
 
 Always read `DESIGN.md` before making any visual or UI decisions.
