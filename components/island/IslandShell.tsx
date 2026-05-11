@@ -22,25 +22,13 @@ import {
   usePostcards,
   useUnreadPostcardCount,
 } from '@/lib/island-api';
-import {
-  dropDown,
-  idleBob,
-  ISLAND_DURATION,
-  ISLAND_EASE,
-} from '@/lib/animations';
+import { ISLAND_DURATION, ISLAND_EASE } from '@/lib/animations';
 import { pickRandomEvent } from '@/lib/island-content';
 import type { Pikmin, Postcard } from '@/lib/island-types';
 import { EggHatchScene } from './EggHatchScene';
 import { WelcomeCard } from './WelcomeCard';
 import { PostcardRitual } from './PostcardRitual';
-
-const PIKMIN_BG_VAR: Record<Pikmin['color'], string> = {
-  green: 'var(--pikmin-green)',
-  violet: 'var(--pikmin-violet)',
-  orange: 'var(--pikmin-orange)',
-  cyan: 'var(--pikmin-cyan)',
-  grey: 'var(--pikmin-grey)',
-};
+import { PhaserIslandHost } from './PhaserIslandHost';
 
 export function IslandShell() {
   const { data, isLoading, isError } = useIslandState();
@@ -226,7 +214,10 @@ function IslandView({
         </Link>
       </header>
 
-      {/* Island view */}
+      {/* Island view — Phase 3.5 Phaser canvas 取代原 DOM/SVG sprites
+          外殼仍是 React 控制 aspect-ratio + 圓角 + 背景漸層,Phaser canvas
+          透明疊上去畫 mascot / pikmin / 蛋。EggHatchScene 仍是 React overlay
+          (Phase 3.6 才搬進 Phaser scene)。 */}
       <motion.section
         className="relative aspect-[3/4] w-full rounded-[40%_60%_55%_45%/45%_50%_50%_55%] overflow-hidden"
         style={{
@@ -237,48 +228,20 @@ function IslandView({
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: ISLAND_DURATION.medium, ease: ISLAND_EASE.enter }}
       >
-        {/* Mascot 站立 */}
-        <motion.div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2"
-          variants={idleBob}
-          animate="animate"
-        >
-          <div
-            className="size-12 rounded-full border-2 border-foreground bg-[var(--island-sand)]"
-            aria-label={`${tribeName} 的島嶼主人,目前 ${mascotAge} 歲`}
-          />
-          <span className="text-[10px] font-display text-foreground/80 tabular-nums">
-            {mascotAge} 歲
-          </span>
-        </motion.div>
+        {/* Phaser canvas — mascot + pikmin + 蛋 都在這 */}
+        <PhaserIslandHost
+          tribeName={tribeName}
+          mascotAge={mascotAge}
+          pikminList={visiblePikmin}
+          hasHatched={hasHatched}
+          // 動畫階段把 hatchingPikmin.id 餵進去,Phaser 不畫這隻
+          // 讓 React EggHatchScene overlay 接管視覺
+          hidePikminId={hatchingPikmin?.id ?? null}
+        />
 
-        {/* 蛋(尚未孵化時出現) */}
-        <AnimatePresence>
-          {!hasHatched && !hatchingPikmin && (
-            <motion.div
-              key="egg"
-              className="absolute right-[20%] top-[55%] size-10"
-              variants={dropDown}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{
-                duration: ISLAND_DURATION.medium,
-                delay: 0.3,
-              }}
-              aria-label="尚未孵化的蛋"
-            >
-              <div className="size-full rounded-full bg-[var(--island-paper)] border-2 border-[var(--island-soil)] shadow-md" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 已孵化的小精靈們 — Phase 2 通常只有 1 隻,Phase 5+ 才會多 */}
-        {hasHatched && !hatchingPikmin && (
-          <PikminFlock pikminList={visiblePikmin} />
-        )}
-
-        {/* 蛋孵化動畫(只在 hatchingPikmin !== null 時播,動畫完 onHatchAnimationDone 接力) */}
+        {/* 蛋孵化動畫 — React overlay 蓋在 Phaser canvas 上方
+            Phase 3.6 會把這個動畫搬進 Phaser scene 用 particle + tween 做更
+            game-feel 的版本。Phase 3.5 先讓架構走通,動畫先用既有的 React 版。*/}
         <AnimatePresence>
           {hatchingPikmin && (
             <EggHatchScene
@@ -316,90 +279,7 @@ function IslandView({
   );
 }
 
-/**
- * Pikmin sprite — Phase 2 placeholder。
- *
- * 跟蛋的視覺區分:
- * - 蛋:純白米色圓 + 棕邊
- * - 小精靈:該顏色圓 + 黑邊 + **頂端一片小葉子**(對應 stage='sprout' 從蛋裡爬出來)
- *
- * Phase 4 真實美術資產進來後此 component 整個換掉。
- */
-function PikminSprite({
-  color,
-  stage,
-}: {
-  color: Pikmin['color'];
-  stage: Pikmin['stage'];
-}) {
-  const showSprout = stage === 'sprout' || stage === 'small' || stage === 'medium';
-  return (
-    <div className="relative size-full">
-      {/* 葉子莖(從圓頂出芽) */}
-      {showSprout && (
-        <svg
-          aria-hidden
-          viewBox="0 0 24 32"
-          className="absolute -top-3 left-1/2 -translate-x-1/2 h-4 w-3 drop-shadow-sm"
-        >
-          {/* 莖 */}
-          <line
-            x1="12"
-            y1="32"
-            x2="12"
-            y2="14"
-            stroke="var(--island-grass-dark)"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* 葉片(水滴形)*/}
-          <path
-            d="M12 4 C 4 4, 4 14, 12 14 C 20 14, 20 4, 12 4 Z"
-            fill="var(--pikmin-green)"
-            stroke="var(--island-grass-dark)"
-            strokeWidth="1.5"
-          />
-        </svg>
-      )}
-      {/* 身體 */}
-      <div
-        className="size-full rounded-full border-2 border-foreground shadow-md"
-        style={{ backgroundColor: PIKMIN_BG_VAR[color] }}
-      />
-    </div>
-  );
-}
-
-/**
- * 小精靈群 — Phase 2 一隻,Phase 5+ 會多到 5-7 隻散布
- */
-function PikminFlock({ pikminList }: { pikminList: Pikmin[] }) {
-  // 第一隻固定位置(對應 Phase 1 蛋的位置),後續每隻偏移
-  const positions = [
-    { right: '20%', top: '55%' },
-    { left: '25%', top: '50%' },
-    { right: '30%', bottom: '25%' },
-    { left: '35%', top: '65%' },
-    { right: '40%', top: '40%' },
-  ];
-
-  return (
-    <>
-      {pikminList.slice(0, 5).map((p) => {
-        const pos = positions[pikminList.indexOf(p)] ?? positions[0];
-        return (
-          <motion.div
-            key={p.id}
-            className="absolute size-10"
-            style={pos}
-            variants={idleBob}
-            animate="animate"
-            aria-label={`${p.color} 小精靈,目前 ${p.stage} 階段`}
-          >
-            <PikminSprite color={p.color} stage={p.stage} />
-          </motion.div>
-        );
-      })}
-    </>
-  );
-}
+// Phase 3.5: PikminFlock + PikminSprite 已搬進 Phaser scene
+// (lib/phaser/island-scene.ts),React 不再 render 它們。
+// EggHatchScene 內部 PikminSpriteInline 還在 — Phase 3.6 蛋孵化動畫搬進
+// Phaser 時連動刪掉。

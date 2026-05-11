@@ -10,6 +10,10 @@
 !.yarn/releases
 !.yarn/versions
 
+# bun lockfile — repo 用 pnpm 為主(pnpm-lock.yaml),bun.lock 是 bun add
+# 留下的副本,Vercel build 走 pnpm 不需要這個。本地用 bun 開發無妨。
+bun.lock
+
 # testing
 /coverage
 
