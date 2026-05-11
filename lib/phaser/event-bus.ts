@@ -62,6 +62,16 @@ export type IslandEvents = {
 
   /** Phaser → React:welcome cutscene user 按下「好」結束 */
   'cutscene:welcome:done': { pikminId: string };
+
+  /** React → Phaser:請播月扣明信片儀式 cutscene */
+  'cutscene:postcard': {
+    postcardId: string;
+    monthYYYYMM: string;
+    body: string;
+  };
+
+  /** Phaser → React:postcard cutscene 完成(user 按「收下」)*/
+  'cutscene:postcard:done': { postcardId: string };
 };
 
 type Listener<E extends keyof IslandEvents> = (data: IslandEvents[E]) => void;

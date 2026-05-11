@@ -14,6 +14,7 @@ import Phaser from 'phaser';
 import { islandEventBus, type IslandEvents } from './event-bus';
 import { sfxPikminTap, sfxTap, unlock as unlockAudio } from './audio';
 import { runEggHatch } from './scenes/egg-hatch-scene';
+import { runPostcardCutscene } from './scenes/postcard-cutscene';
 import { runWelcomeCutscene } from './scenes/welcome-cutscene';
 import {
   createCloudSprite,
@@ -59,6 +60,7 @@ export class IslandScene extends Phaser.Scene {
   private unsubscribeStateUpdate?: () => void;
   private unsubscribeEggHatch?: () => void;
   private unsubscribeWelcome?: () => void;
+  private unsubscribePostcard?: () => void;
 
   constructor() {
     super({ key: 'IslandScene' });
@@ -107,6 +109,22 @@ export class IslandScene extends Phaser.Scene {
       },
     );
 
+    this.unsubscribePostcard = islandEventBus.on(
+      'cutscene:postcard',
+      async ({ postcardId, monthYYYYMM, body }) => {
+        await runPostcardCutscene(this, {
+          centerX: ISLAND_WIDTH / 2,
+          centerY: ISLAND_HEIGHT / 2,
+          width: ISLAND_WIDTH,
+          height: ISLAND_HEIGHT,
+          monthYYYYMM,
+          body,
+          reducedMotion: prefersReducedMotion(),
+        });
+        islandEventBus.emit('cutscene:postcard:done', { postcardId });
+      },
+    );
+
     // 通知 React scene 已準備好
     islandEventBus.emit('scene:ready', null);
 
@@ -114,6 +132,7 @@ export class IslandScene extends Phaser.Scene {
       this.unsubscribeStateUpdate?.();
       this.unsubscribeEggHatch?.();
       this.unsubscribeWelcome?.();
+      this.unsubscribePostcard?.();
       this.pikminContainers.clear();
     });
   }

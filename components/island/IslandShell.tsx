@@ -24,11 +24,11 @@ import {
 } from '@/lib/island-api';
 import { ISLAND_DURATION, ISLAND_EASE } from '@/lib/animations';
 import { pickRandomEvent, pikminWelcomeFlavor } from '@/lib/island-content';
-import type { Pikmin, Postcard } from '@/lib/island-types';
+import type { Pikmin } from '@/lib/island-types';
 import { islandEventBus } from '@/lib/phaser/event-bus';
-// Phase 3.6:React EggHatchScene + WelcomeCard 已搬進 Phaser cutscene,
-// 此處不再 import 它們。.tsx 檔留著當參照,等 PostcardRitual 也進 Phaser 後一起刪
-import { PostcardRitual } from './PostcardRitual';
+// Phase 3.6 + 3.7:EggHatchScene / WelcomeCard / PostcardRitual 都搬進 Phaser
+// cutscene。React .tsx 檔留著當參照,/island/postcards 列表頁 reopen 仍用
+// React vaul drawer 版本(archive browse 不是 first-time ritual)
 import { PhaserIslandHost } from './PhaserIslandHost';
 
 export function IslandShell() {
@@ -85,27 +85,39 @@ export function IslandShell() {
   const isUnconsumedTrigger =
     triggerNewPikmin !== null && cutscenePhase !== 'consumed';
 
-  // Phase 3:monthly trigger 帶來的新 postcards → 自動推進 ritual
+  // Phase 3.7 純 Phaser:monthly trigger 帶來的新 postcards → emit Phaser cutscene
   // 只在 hatch ceremony 結束後(WelcomeCard consumed)才推 postcard,避免疊加儀式
   const newPostcardIds = data?.monthlyTrigger?.newPostcardIds ?? [];
   const [autoOpenedPostcardId, setAutoOpenedPostcardId] = useState<string | null>(null);
-  const [activePostcard, setActivePostcard] = useState<Postcard | null>(null);
 
   useEffect(() => {
     if (newPostcardIds.length === 0) return;
-    if (isUnconsumedTrigger) return; // 等 hatch 儀式完才推 postcard
+    if (isUnconsumedTrigger) return; // 等 hatch + welcome 都完才推 postcard
     const list = postcardsQuery.data ?? [];
     // 只挑「本次 trigger 帶來的」postcard,從新到舊
     for (const id of newPostcardIds) {
       if (autoOpenedPostcardId === id) continue;
       const found = list.find((p) => p.id === id);
       if (found) {
-        setActivePostcard(found);
+        // 觸發 Phaser cutscene(canvas 內信紙 + 打字機 + 戳章 fly)
+        islandEventBus.emit('cutscene:postcard', {
+          postcardId: found.id,
+          monthYYYYMM: found.monthYYYYMM,
+          body: found.body,
+        });
         setAutoOpenedPostcardId(id);
         break;
       }
     }
   }, [newPostcardIds, isUnconsumedTrigger, postcardsQuery.data, autoOpenedPostcardId]);
+
+  // 接 cutscene:postcard:done → markRead
+  useEffect(() => {
+    const off = islandEventBus.on('cutscene:postcard:done', ({ postcardId }) => {
+      markRead.mutate([postcardId]);
+    });
+    return off;
+  }, [markRead]);
 
   if (isLoading) {
     return (
@@ -148,32 +160,20 @@ export function IslandShell() {
     : allPikmin;
   const hasHatched = visiblePikmin.length > 0;
 
+  // Phase 3.7:auto-popup postcard ritual 走 Phaser cutscene,IslandShell 不再
+  // render <PostcardRitual>。reopen historical postcards 在 /island/postcards 那邊
+  // 仍走 React vaul drawer(差異化 UX:first-time ritual = 沉浸式 game canvas,
+  // archive browse = 快速 reading UI)
   return (
-    <>
-      <IslandView
-        tribeName={tribeName}
-        streak={streak}
-        mascotAge={mascotAge}
-        visiblePikmin={visiblePikmin}
-        hasHatched={hasHatched}
-        hidePikminId={isUnconsumedTrigger ? triggerNewPikmin?.id ?? null : null}
-        unreadCount={unreadCount}
-      />
-
-      {/* PostcardRitual — Phase 3.7 才搬進 Phaser,暫時還是 React vaul drawer */}
-      <PostcardRitual
-        postcard={activePostcard}
-        open={activePostcard !== null}
-        onOpenChange={(open) => {
-          if (!open) setActivePostcard(null);
-        }}
-        onClose={() => {
-          if (activePostcard) {
-            markRead.mutate([activePostcard.id]);
-          }
-        }}
-      />
-    </>
+    <IslandView
+      tribeName={tribeName}
+      streak={streak}
+      mascotAge={mascotAge}
+      visiblePikmin={visiblePikmin}
+      hasHatched={hasHatched}
+      hidePikminId={isUnconsumedTrigger ? triggerNewPikmin?.id ?? null : null}
+      unreadCount={unreadCount}
+    />
   );
 }
 
