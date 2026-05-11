@@ -12,6 +12,9 @@
 
 import Phaser from 'phaser';
 import { islandEventBus, type IslandEvents } from './event-bus';
+import { sfxPikminTap, sfxTap, unlock as unlockAudio } from './audio';
+import { runEggHatch } from './scenes/egg-hatch-scene';
+import { runWelcomeCutscene } from './scenes/welcome-cutscene';
 import {
   createCloudSprite,
   createEggPotSprite,
@@ -22,6 +25,12 @@ import {
 
 const ISLAND_WIDTH = 360;
 const ISLAND_HEIGHT = 480;
+
+/** 偵測 user OS 是否開啟「降低動態效果」(GDD §32.6 a11y 規格) */
+function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 const PIKMIN_POSITIONS: Array<{ x: number; y: number }> = [
   { x: 250, y: 280 },
@@ -48,6 +57,8 @@ export class IslandScene extends Phaser.Scene {
 
   private currentState: IslandEvents['state:update'] | null = null;
   private unsubscribeStateUpdate?: () => void;
+  private unsubscribeEggHatch?: () => void;
+  private unsubscribeWelcome?: () => void;
 
   constructor() {
     super({ key: 'IslandScene' });
@@ -66,11 +77,43 @@ export class IslandScene extends Phaser.Scene {
       this.syncToState();
     });
 
+    // 訂閱 React 觸發的 cutscene
+    this.unsubscribeEggHatch = islandEventBus.on(
+      'cutscene:eggHatch',
+      async ({ pikminId, pikminColor }) => {
+        await runEggHatch(this, {
+          x: 250,
+          y: 280,
+          pikminColor,
+          reducedMotion: prefersReducedMotion(),
+        });
+        islandEventBus.emit('cutscene:eggHatch:done', { pikminId });
+      },
+    );
+
+    this.unsubscribeWelcome = islandEventBus.on(
+      'cutscene:welcome',
+      async ({ pikminId, pikminColor, tribeName, flavor }) => {
+        await runWelcomeCutscene(this, {
+          centerX: ISLAND_WIDTH / 2,
+          centerY: ISLAND_HEIGHT / 2,
+          width: ISLAND_WIDTH,
+          tribeName,
+          pikminColor,
+          flavor,
+          reducedMotion: prefersReducedMotion(),
+        });
+        islandEventBus.emit('cutscene:welcome:done', { pikminId });
+      },
+    );
+
     // 通知 React scene 已準備好
     islandEventBus.emit('scene:ready', null);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribeStateUpdate?.();
+      this.unsubscribeEggHatch?.();
+      this.unsubscribeWelcome?.();
       this.pikminContainers.clear();
     });
   }
@@ -160,9 +203,11 @@ export class IslandScene extends Phaser.Scene {
     const refs = createMascotSprite(this, age);
     refs.container.setPosition(ISLAND_WIDTH / 2, ISLAND_HEIGHT / 2);
 
-    // Tap mascot → squash-stretch + emit event
+    // Tap mascot → audio unlock + sfx + squash-stretch + emit event
     refs.body.setInteractive();
     refs.body.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
+      unlockAudio(); // iOS audio unlock(only first tap matters)
+      sfxTap();
       this.tweens.add({
         targets: refs.container,
         scaleY: 0.9,
@@ -251,9 +296,11 @@ export class IslandScene extends Phaser.Scene {
       const refs = createPikminSprite(this, p.color);
       refs.container.setPosition(pos.x, pos.y);
 
-      // Tap → squash + emit
+      // Tap → audio unlock + sfx + squash + emit
       refs.body.setInteractive();
       refs.body.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
+        unlockAudio();
+        sfxPikminTap();
         this.tweens.add({
           targets: refs.container,
           scaleY: 0.85,

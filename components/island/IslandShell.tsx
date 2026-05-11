@@ -23,10 +23,11 @@ import {
   useUnreadPostcardCount,
 } from '@/lib/island-api';
 import { ISLAND_DURATION, ISLAND_EASE } from '@/lib/animations';
-import { pickRandomEvent } from '@/lib/island-content';
+import { pickRandomEvent, pikminWelcomeFlavor } from '@/lib/island-content';
 import type { Pikmin, Postcard } from '@/lib/island-types';
-import { EggHatchScene } from './EggHatchScene';
-import { WelcomeCard } from './WelcomeCard';
+import { islandEventBus } from '@/lib/phaser/event-bus';
+// Phase 3.6:React EggHatchScene + WelcomeCard 已搬進 Phaser cutscene,
+// 此處不再 import 它們。.tsx 檔留著當參照,等 PostcardRitual 也進 Phaser 後一起刪
 import { PostcardRitual } from './PostcardRitual';
 import { PhaserIslandHost } from './PhaserIslandHost';
 
@@ -36,18 +37,53 @@ export function IslandShell() {
   const unreadCount = useUnreadPostcardCount();
   const markRead = useMarkPostcardsRead();
 
-  // 動畫 consumed gate:每個 trigger.newPikmin.id 對應一次播放
+  // Phase 3.6 純 Phaser:cutscene 完全在 Phaser scene 內播,React 只 emit + 接 done
   const triggerNewPikmin = data?.monthlyTrigger?.newPikmin ?? null;
-  const [consumedHatchId, setConsumedHatchId] = useState<string | null>(null);
-  // 兩段式:先播動畫(EggHatchScene),動畫完才出 WelcomeCard 讓 user acknowledge
-  const [hatchAnimationDoneId, setHatchAnimationDoneId] = useState<string | null>(null);
+
+  // Cutscene 三階段 state:idle → hatching → welcoming → consumed
+  type CutscenePhase = 'idle' | 'hatching' | 'welcoming' | 'consumed';
+  const [cutscenePhase, setCutscenePhase] = useState<CutscenePhase>('idle');
+  const [cutsceneTargetId, setCutsceneTargetId] = useState<string | null>(null);
+
+  // 偵測新 trigger.newPikmin → kick off 蛋孵化 cutscene
+  useEffect(() => {
+    if (!triggerNewPikmin) return;
+    if (cutsceneTargetId === triggerNewPikmin.id) return; // 已經處理過
+
+    setCutsceneTargetId(triggerNewPikmin.id);
+    setCutscenePhase('hatching');
+    islandEventBus.emit('cutscene:eggHatch', {
+      pikminId: triggerNewPikmin.id,
+      pikminColor: triggerNewPikmin.color,
+    });
+  }, [triggerNewPikmin, cutsceneTargetId]);
+
+  // 接 hatch:done → kick welcome cutscene
+  useEffect(() => {
+    const off = islandEventBus.on('cutscene:eggHatch:done', ({ pikminId }) => {
+      if (pikminId !== triggerNewPikmin?.id) return;
+      setCutscenePhase('welcoming');
+      islandEventBus.emit('cutscene:welcome', {
+        pikminId,
+        pikminColor: triggerNewPikmin.color,
+        tribeName: data?.state.profile.pikminTribeName ?? '小苗',
+        flavor: pikminWelcomeFlavor(triggerNewPikmin),
+      });
+    });
+    return off;
+  }, [triggerNewPikmin, data?.state.profile.pikminTribeName]);
+
+  // 接 welcome:done → mark consumed,Phaser scene 接手畫 idle pikmin
+  useEffect(() => {
+    const off = islandEventBus.on('cutscene:welcome:done', ({ pikminId }) => {
+      if (pikminId !== triggerNewPikmin?.id) return;
+      setCutscenePhase('consumed');
+    });
+    return off;
+  }, [triggerNewPikmin]);
 
   const isUnconsumedTrigger =
-    triggerNewPikmin !== null && triggerNewPikmin.id !== consumedHatchId;
-  const isPlayingHatchAnimation =
-    isUnconsumedTrigger && triggerNewPikmin.id !== hatchAnimationDoneId;
-  const isShowingWelcomeCard =
-    isUnconsumedTrigger && triggerNewPikmin.id === hatchAnimationDoneId;
+    triggerNewPikmin !== null && cutscenePhase !== 'consumed';
 
   // Phase 3:monthly trigger 帶來的新 postcards → 自動推進 ritual
   // 只在 hatch ceremony 結束後(WelcomeCard consumed)才推 postcard,避免疊加儀式
@@ -105,9 +141,9 @@ export function IslandShell() {
   const mascotAge = state.profile.mascot.age;
   const allPikmin = state.collections.pikmin;
 
-  // 正在孵化的 pikmin 從 visiblePikmin 過濾掉(只在動畫階段),避免 flock 搶先畫到
-  // WelcomeCard 階段 pikmin 已該在 flock 顯示(user 看到她在島上 + 卡片同時)
-  const visiblePikmin = isPlayingHatchAnimation
+  // Cutscene 進行中(hatch + welcome 都算)→ 把目標 pikmin 從 Phaser scene 過濾掉
+  // welcome:done 後才正式出現在島上 idle bob
+  const visiblePikmin = isUnconsumedTrigger
     ? allPikmin.filter((p) => p.id !== triggerNewPikmin?.id)
     : allPikmin;
   const hasHatched = visiblePikmin.length > 0;
@@ -120,18 +156,11 @@ export function IslandShell() {
         mascotAge={mascotAge}
         visiblePikmin={visiblePikmin}
         hasHatched={hasHatched}
-        hatchingPikmin={isPlayingHatchAnimation ? triggerNewPikmin : null}
-        welcomingPikmin={isShowingWelcomeCard ? triggerNewPikmin : null}
+        hidePikminId={isUnconsumedTrigger ? triggerNewPikmin?.id ?? null : null}
         unreadCount={unreadCount}
-        onHatchAnimationDone={() =>
-          setHatchAnimationDoneId(triggerNewPikmin?.id ?? null)
-        }
-        onWelcomeAcknowledge={() =>
-          setConsumedHatchId(triggerNewPikmin?.id ?? null)
-        }
       />
 
-      {/* PostcardRitual portal — 顯示一張 postcard 給 user 看完 + 蓋戳章 */}
+      {/* PostcardRitual — Phase 3.7 才搬進 Phaser,暫時還是 React vaul drawer */}
       <PostcardRitual
         postcard={activePostcard}
         open={activePostcard !== null}
@@ -139,7 +168,6 @@ export function IslandShell() {
           if (!open) setActivePostcard(null);
         }}
         onClose={() => {
-          // 關閉 ritual → 標已讀,client 會 refetch postcards 更新紅點
           if (activePostcard) {
             markRead.mutate([activePostcard.id]);
           }
@@ -155,13 +183,9 @@ type ViewProps = {
   mascotAge: number;
   visiblePikmin: Pikmin[];
   hasHatched: boolean;
-  /** 動畫階段正在孵化的 pikmin(EggHatchScene 顯示) */
-  hatchingPikmin: Pikmin | null;
-  /** 動畫播完後待 acknowledge 的 pikmin(WelcomeCard 顯示) */
-  welcomingPikmin: Pikmin | null;
+  /** Cutscene 進行中要從 Phaser scene 過濾掉的 pikmin id(避免重複出現) */
+  hidePikminId: string | null;
   unreadCount: number;
-  onHatchAnimationDone: () => void;
-  onWelcomeAcknowledge: () => void;
 };
 
 function IslandView({
@@ -170,11 +194,8 @@ function IslandView({
   mascotAge,
   visiblePikmin,
   hasHatched,
-  hatchingPikmin,
-  welcomingPikmin,
+  hidePikminId,
   unreadCount,
-  onHatchAnimationDone,
-  onWelcomeAcknowledge,
 }: ViewProps) {
   // 隨機事件 — 用 daily seed 確保同一天打開看到一樣的 event(避免 hydration 閃爍)
   const dailyEvent = useMemo(() => {
@@ -214,10 +235,10 @@ function IslandView({
         </Link>
       </header>
 
-      {/* Island view — Phase 3.5 Phaser canvas 取代原 DOM/SVG sprites
-          外殼仍是 React 控制 aspect-ratio + 圓角 + 背景漸層,Phaser canvas
-          透明疊上去畫 mascot / pikmin / 蛋。EggHatchScene 仍是 React overlay
-          (Phase 3.6 才搬進 Phaser scene)。 */}
+      {/* Island view — Phase 3.6 純 Phaser canvas
+          - mascot / pikmin / 蛋盆 / 雲 / 草 全部在 Phaser scene 渲染
+          - EggHatchScene + WelcomeCard cinematic 也都在 Phaser scene 內播
+          - React 只控外殼(aspect ratio + 圓角 + 漸層背景) */}
       <motion.section
         className="relative aspect-[3/4] w-full rounded-[40%_60%_55%_45%/45%_50%_50%_55%] overflow-hidden"
         style={{
@@ -228,53 +249,26 @@ function IslandView({
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: ISLAND_DURATION.medium, ease: ISLAND_EASE.enter }}
       >
-        {/* Phaser canvas — mascot + pikmin + 蛋 都在這 */}
         <PhaserIslandHost
           tribeName={tribeName}
           mascotAge={mascotAge}
           pikminList={visiblePikmin}
           hasHatched={hasHatched}
-          // 動畫階段把 hatchingPikmin.id 餵進去,Phaser 不畫這隻
-          // 讓 React EggHatchScene overlay 接管視覺
-          hidePikminId={hatchingPikmin?.id ?? null}
+          hidePikminId={hidePikminId}
         />
-
-        {/* 蛋孵化動畫 — React overlay 蓋在 Phaser canvas 上方
-            Phase 3.6 會把這個動畫搬進 Phaser scene 用 particle + tween 做更
-            game-feel 的版本。Phase 3.5 先讓架構走通,動畫先用既有的 React 版。*/}
-        <AnimatePresence>
-          {hatchingPikmin && (
-            <EggHatchScene
-              key={hatchingPikmin.id}
-              pikmin={hatchingPikmin}
-              onComplete={onHatchAnimationDone}
-            />
-          )}
-        </AnimatePresence>
       </motion.section>
 
-      {/* 文字區:welcomingPikmin 在 → WelcomeCard;否則 → daily random event */}
-      <AnimatePresence mode="wait">
-        {welcomingPikmin ? (
-          <WelcomeCard
-            key={`welcome-${welcomingPikmin.id}`}
-            pikmin={welcomingPikmin}
-            tribeName={tribeName}
-            onAcknowledge={onWelcomeAcknowledge}
-          />
-        ) : (
-          <motion.div
-            key="daily-event"
-            className="text-center text-sm text-muted-foreground"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: ISLAND_DURATION.short, delay: 0.6 }}
-          >
-            {dailyEvent}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Daily random event text — Phase 3.7 才會搬進 Phaser BitmapText.
+          現在還是 React,因為 WelcomeCard cutscene 結束後文字直接顯示沒問題 */}
+      <motion.div
+        key="daily-event"
+        className="text-center text-sm text-muted-foreground"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: ISLAND_DURATION.short, delay: 0.6 }}
+      >
+        {dailyEvent}
+      </motion.div>
     </main>
   );
 }

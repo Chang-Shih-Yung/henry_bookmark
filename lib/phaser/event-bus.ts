@@ -38,6 +38,30 @@ export type IslandEvents = {
 
   /** Phaser → React:scene ready(代表 canvas 初始化完成,React 可以推 state 進來) */
   'scene:ready': null;
+
+  /* ============================================================
+     Phase 3.6 — 純 Phaser cinematic
+     ============================================================ */
+
+  /** React → Phaser:請播蛋孵化 cutscene(server trigger 來) */
+  'cutscene:eggHatch': {
+    pikminId: string;
+    pikminColor: 'green' | 'violet' | 'orange' | 'cyan' | 'grey';
+  };
+
+  /** Phaser → React:蛋孵化 cutscene 動畫播完(scene 接下來 spawn idle pikmin)*/
+  'cutscene:eggHatch:done': { pikminId: string };
+
+  /** React → Phaser:請播 welcome cutscene */
+  'cutscene:welcome': {
+    pikminId: string;
+    pikminColor: 'green' | 'violet' | 'orange' | 'cyan' | 'grey';
+    tribeName: string;
+    flavor: string;
+  };
+
+  /** Phaser → React:welcome cutscene user 按下「好」結束 */
+  'cutscene:welcome:done': { pikminId: string };
 };
 
 type Listener<E extends keyof IslandEvents> = (data: IslandEvents[E]) => void;
