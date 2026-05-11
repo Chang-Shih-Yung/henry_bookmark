@@ -1,41 +1,24 @@
 /**
- * IslandScene — Phaser 場景(Phase 3.5 — Phaser 重寫第一階段)。
+ * IslandScene — Phaser 場景(Phase 3.5 + 3.5.1 procedural sprite polish)。
  *
- * 渲染:mascot、pikmin(已孵化的)、egg(未孵化時)、島嶼背景。
+ * 渲染:mascot、pikmin、egg-pot、雲、草叢、互動。
  * 互動:tap mascot / tap pikmin → emit event bus event 給 React。
  *
- * Phase 3.5 限制:
- * - 視覺仍是純色圓圈 + 葉子(Phase 4 美術替換成 sprite sheet 再來大改)
- * - 沒有 walk cycle / 沒粒子 / 沒音效(Phase 3.6 / 3.7 才加)
- * - 蛋孵化動畫由 React `<EggHatchScene>` overlay 處理(Phase 3.6 才搬進 scene)
- *
- * 為什麼還用「圓圈」:Phaser 真正的差異 Phase 4 真美術才會發揮,Phase 3.5
- * 重點是**驗證架構走得通** — React ↔ Phaser bridge、scene lifecycle、tween、
- * tap input、event bus 全部能 work。畫面相似度 95% 跟 Phase 3 一樣。
+ * Phase 3.5.1 升級 vs 3.5:
+ * - 純色圓圈 → procedural sprite(mascot 五官 + 身體、pikmin 大眼 + stem 葉子、egg-pot 茶杯造型 + 嫩芽)
+ * - 加雲(背景持續飄)、草叢(地面點綴)
+ * - Sprite 結構抽到 lib/phaser/sprites.ts,Phase 4 真實美術 sprite atlas 替換時改那邊
  */
 
 import Phaser from 'phaser';
 import { islandEventBus, type IslandEvents } from './event-bus';
-
-const COLOR_TO_HEX: Record<string, number> = {
-  // 對應 globals.css 的 --pikmin-* token(oklch → hex 近似)
-  green: 0x9bd66d,   // pikmin-green
-  violet: 0x8b5fbf,  // pikmin-violet
-  orange: 0xf2a766,  // pikmin-orange
-  cyan: 0x66c2d6,    // pikmin-cyan
-  grey: 0xa6a6a6,    // pikmin-grey
-};
-
-const PALETTE = {
-  skyDay: 0xc8e0ec,
-  grass: 0xa3d99b,
-  water: 0x88c2d6,
-  sand: 0xe8d8a3,
-  soil: 0x9c7a4f,
-  paper: 0xeee0c2,
-  grassDark: 0x4f8c5a,
-  foreground: 0xfbfbfb,
-} as const;
+import {
+  createCloudSprite,
+  createEggPotSprite,
+  createGrassTuft,
+  createMascotSprite,
+  createPikminSprite,
+} from './sprites';
 
 const ISLAND_WIDTH = 360;
 const ISLAND_HEIGHT = 480;
@@ -54,15 +37,16 @@ const PIKMIN_POSITIONS: Array<{ x: number; y: number }> = [
 
 type PikminInput = IslandEvents['state:update']['pikmin'];
 
+type MascotRefs = ReturnType<typeof createMascotSprite>;
+type PikminRefs = ReturnType<typeof createPikminSprite>;
+type EggRefs = ReturnType<typeof createEggPotSprite>;
+
 export class IslandScene extends Phaser.Scene {
-  private mascotContainer?: Phaser.GameObjects.Container;
-  private mascotAgeText?: Phaser.GameObjects.Text;
-  private pikminContainers: Map<string, Phaser.GameObjects.Container> = new Map();
-  private eggContainer?: Phaser.GameObjects.Container;
+  private mascotRefs?: MascotRefs;
+  private pikminContainers: Map<string, PikminRefs> = new Map();
+  private eggRefs?: EggRefs;
 
   private currentState: IslandEvents['state:update'] | null = null;
-
-  // event bus subscription cleanup
   private unsubscribeStateUpdate?: () => void;
 
   constructor() {
@@ -72,16 +56,19 @@ export class IslandScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('rgba(0,0,0,0)');
 
+    // 環境(雲 + 草叢)— 持續飄 / 微擺
+    this.spawnAmbientClouds();
+    this.spawnGrassTufts();
+
     // 訂閱 React 推進來的 state
     this.unsubscribeStateUpdate = islandEventBus.on('state:update', (state) => {
       this.currentState = state;
       this.syncToState();
     });
 
-    // 通知 React scene 已準備好接收 state
+    // 通知 React scene 已準備好
     islandEventBus.emit('scene:ready', null);
 
-    // 場景 cleanup
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribeStateUpdate?.();
       this.pikminContainers.clear();
@@ -89,70 +76,114 @@ export class IslandScene extends Phaser.Scene {
   }
 
   /* ============================================================
-     State sync — 根據 currentState 增刪 sprite
+     Ambient environment — 雲跟草叢,只在 create 時建一次,持續動
      ============================================================ */
+
+  private spawnAmbientClouds() {
+    // 3 朵不同大小的雲,從左飄到右,各自速度跟高度不同
+    const clouds = [
+      { y: 50, size: 'medium' as const, speed: 60_000, startX: -40 },
+      { y: 90, size: 'small' as const, speed: 45_000, startX: -80 },
+      { y: 130, size: 'small' as const, speed: 70_000, startX: -120 },
+    ];
+
+    clouds.forEach((c) => {
+      const cloud = createCloudSprite(this, c.size);
+      cloud.setPosition(c.startX, c.y);
+      this.tweens.add({
+        targets: cloud,
+        x: ISLAND_WIDTH + 60,
+        duration: c.speed,
+        repeat: -1,
+        ease: 'Linear',
+        onRepeat: () => {
+          cloud.setX(c.startX);
+        },
+      });
+    });
+  }
+
+  private spawnGrassTufts() {
+    // 6-8 撮草,散在「島嶼草地」高度範圍,微風搖擺
+    const tuftPositions = [
+      { x: 60, y: 400 },
+      { x: 90, y: 440 },
+      { x: 140, y: 410 },
+      { x: 200, y: 450 },
+      { x: 280, y: 420 },
+      { x: 310, y: 390 },
+      { x: 180, y: 470 },
+    ];
+
+    tuftPositions.forEach((pos, i) => {
+      const tuft = createGrassTuft(this);
+      tuft.setPosition(pos.x, pos.y);
+      // 微風搖擺(skew rotation,各自相位)
+      this.tweens.add({
+        targets: tuft,
+        rotation: 0.08,
+        duration: 1200 + Math.random() * 600,
+        delay: i * 150,
+        yoyo: true,
+        repeat: -1,
+        ease: Phaser.Math.Easing.Sine.InOut,
+      });
+    });
+  }
+
+  /* ============================================================
+     State sync
+     ============================================================ */
+
   private syncToState() {
     if (!this.currentState) return;
-    const { tribeName, mascotAge, pikmin, hasHatched, hidePikminId } = this.currentState;
-    void tribeName; // Phase 3.5 暫沒用,Phase 4 sprite 會用族名做客製
+    const { mascotAge, pikmin, hasHatched, hidePikminId } = this.currentState;
 
     this.ensureMascot(mascotAge);
 
-    // 蛋:hasHatched=false 時顯示
     if (!hasHatched) {
-      this.ensureEgg();
+      this.ensureEggPot();
     } else {
-      this.removeEgg();
+      this.removeEggPot();
     }
 
-    // Pikmin:同步 list,過濾掉 hidePikminId(React EggHatchScene overlay 正在播)
     const visible = pikmin.filter((p) => p.id !== hidePikminId);
     this.syncPikmin(visible);
   }
 
   private ensureMascot(age: number) {
-    if (this.mascotContainer) {
-      // 更新年齡 text
-      this.mascotAgeText?.setText(`${age} 歲`);
+    if (this.mascotRefs) {
+      this.mascotRefs.ageText.setText(`${age} 歲`);
       return;
     }
 
-    const container = this.add.container(ISLAND_WIDTH / 2, ISLAND_HEIGHT / 2);
+    const refs = createMascotSprite(this, age);
+    refs.container.setPosition(ISLAND_WIDTH / 2, ISLAND_HEIGHT / 2);
 
-    // Mascot body
-    const body = this.add.circle(0, 0, 24, PALETTE.sand);
-    body.setStrokeStyle(2, PALETTE.foreground);
-    container.add(body);
-
-    // Age text
-    const ageText = this.add
-      .text(0, 38, `${age} 歲`, {
-        fontSize: '10px',
-        color: '#fbfbfbcc',
-        fontFamily: 'ui-monospace, SF Mono, monospace',
-      })
-      .setOrigin(0.5, 0);
-    container.add(ageText);
-    this.mascotAgeText = ageText;
-
-    // Hit area + tap → event bus
-    body.setInteractive();
-    body.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
-      // squash-stretch micro animation(Phase 3.5 簡化版)
+    // Tap mascot → squash-stretch + emit event
+    refs.body.setInteractive();
+    refs.body.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
       this.tweens.add({
-        targets: body,
-        scaleX: 1.15,
-        scaleY: 0.85,
-        duration: 100,
+        targets: refs.container,
+        scaleY: 0.9,
+        scaleX: 1.1,
+        duration: 110,
         yoyo: true,
         ease: Phaser.Math.Easing.Cubic.Out,
       });
-      islandEventBus.emit('mascot:tap', { x: container.x, y: container.y });
+      islandEventBus.emit('mascot:tap', {
+        x: refs.container.x,
+        y: refs.container.y,
+      });
+    });
+    refs.head.setInteractive();
+    refs.head.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
+      refs.body.emit(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN);
     });
 
-    // Idle bob — 持續上下浮動
+    // Idle bob
     this.tweens.add({
-      targets: container,
+      targets: refs.container,
       y: ISLAND_HEIGHT / 2 - 4,
       duration: 1800,
       yoyo: true,
@@ -160,22 +191,20 @@ export class IslandScene extends Phaser.Scene {
       ease: Phaser.Math.Easing.Sine.InOut,
     });
 
-    this.mascotContainer = container;
+    this.mascotRefs = refs;
   }
 
-  private ensureEgg() {
-    if (this.eggContainer) return;
+  private ensureEggPot() {
+    if (this.eggRefs) return;
 
-    const container = this.add.container(250, 280);
-    const egg = this.add.circle(0, 0, 20, PALETTE.paper);
-    egg.setStrokeStyle(2, PALETTE.soil);
-    container.add(egg);
+    const refs = createEggPotSprite(this);
+    refs.container.setPosition(250, 280);
 
     // 從上掉下進場
-    container.setY(280 - 40);
-    container.setAlpha(0);
+    refs.container.setY(280 - 40);
+    refs.container.setAlpha(0);
     this.tweens.add({
-      targets: container,
+      targets: refs.container,
       y: 280,
       alpha: 1,
       duration: 700,
@@ -183,22 +212,33 @@ export class IslandScene extends Phaser.Scene {
       ease: Phaser.Math.Easing.Cubic.Out,
     });
 
-    this.eggContainer = container;
+    // 微微 idle 搖擺(嫩芽風中晃)
+    this.tweens.add({
+      targets: refs.container,
+      rotation: 0.04,
+      duration: 2200,
+      delay: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: Phaser.Math.Easing.Sine.InOut,
+    });
+
+    this.eggRefs = refs;
   }
 
-  private removeEgg() {
-    if (!this.eggContainer) return;
-    this.eggContainer.destroy();
-    this.eggContainer = undefined;
+  private removeEggPot() {
+    if (!this.eggRefs) return;
+    this.eggRefs.container.destroy();
+    this.eggRefs = undefined;
   }
 
   private syncPikmin(list: PikminInput) {
     const incomingIds = new Set(list.map((p) => p.id));
 
-    // 移除不在 list 的舊 sprite
-    for (const [id, container] of this.pikminContainers) {
+    // 移除消失的
+    for (const [id, refs] of this.pikminContainers) {
       if (!incomingIds.has(id)) {
-        container.destroy();
+        refs.container.destroy();
         this.pikminContainers.delete(id);
       }
     }
@@ -207,39 +247,26 @@ export class IslandScene extends Phaser.Scene {
     list.forEach((p, i) => {
       if (this.pikminContainers.has(p.id)) return;
       const pos = PIKMIN_POSITIONS[i] ?? PIKMIN_POSITIONS[0];
-      const container = this.add.container(pos.x, pos.y);
 
-      // 葉子 stem
-      const stem = this.add.line(0, -28, 0, 0, 0, 14, PALETTE.grassDark, 1);
-      stem.setLineWidth(2);
-      container.add(stem);
+      const refs = createPikminSprite(this, p.color);
+      refs.container.setPosition(pos.x, pos.y);
 
-      // 葉子(水滴形 simplified to ellipse for now)
-      const leaf = this.add.ellipse(0, -32, 10, 8, COLOR_TO_HEX.green);
-      leaf.setStrokeStyle(1.5, PALETTE.grassDark);
-      container.add(leaf);
-
-      // Body
-      const body = this.add.circle(0, 0, 20, COLOR_TO_HEX[p.color] ?? 0xffffff);
-      body.setStrokeStyle(2, PALETTE.foreground);
-      container.add(body);
-
-      // Hit area
-      body.setInteractive();
-      body.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
+      // Tap → squash + emit
+      refs.body.setInteractive();
+      refs.body.on(Phaser.Input.Events.GAMEOBJECT_POINTER_DOWN, () => {
         this.tweens.add({
-          targets: body,
-          scaleX: 1.15,
+          targets: refs.container,
           scaleY: 0.85,
+          scaleX: 1.15,
           duration: 100,
           yoyo: true,
         });
         islandEventBus.emit('pikmin:tap', { id: p.id, color: p.color });
       });
 
-      // Idle bob with random offset(避免所有 pikmin 同步上下動)
+      // Idle bob with random offset
       this.tweens.add({
-        targets: container,
+        targets: refs.container,
         y: pos.y - 3,
         duration: 1500 + Math.random() * 600,
         delay: Math.random() * 500,
@@ -248,7 +275,7 @@ export class IslandScene extends Phaser.Scene {
         ease: Phaser.Math.Easing.Sine.InOut,
       });
 
-      this.pikminContainers.set(p.id, container);
+      this.pikminContainers.set(p.id, refs);
     });
   }
 }
